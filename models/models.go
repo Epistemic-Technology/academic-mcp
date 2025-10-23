@@ -1,0 +1,34 @@
+package models
+
+type ParsedItem struct {
+	Metadata   ItemMetadata `json:"metadata,omitempty"`
+	Pages      []string     `json:"pages,omitempty"`
+	References []Reference  `json:"references,omitempty"`
+	Images     []Image      `json:"images,omitempty"`
+	Tables     []Table      `json:"tables,omitempty"`
+}
+
+type ItemMetadata struct {
+	Title           string   `json:"title,omitempty"`
+	Authors         []string `json:"authors,omitempty"`
+	PublicationDate string   `json:"publication_date,omitempty"`
+	Publication     string   `json:"publication,omitempty"`
+	DOI             string   `json:"doi,omitempty"`
+	Abstract        string   `json:"abstract,omitempty"`
+}
+
+type Reference struct {
+	ReferenceText string `json:"reference_text,omitempty"`
+	DOI           string `json:"doi,omitempty"`
+}
+
+type Image struct {
+	ImageURL string `json:"image_url,omitempty"`
+	Caption  string `json:"caption,omitempty"`
+}
+
+type Table struct {
+	TableID    string `json:"table_id,omitempty"`
+	TableTitle string `json:"table_title,omitempty"`
+	TableData  string `json:"table_data,omitempty"`
+}
