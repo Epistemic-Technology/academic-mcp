@@ -8,6 +8,13 @@ type ParsedItem struct {
 	Tables     []Table      `json:"tables,omitempty"`
 }
 
+type ParsedPage struct {
+	Content    string      `json:"content,omitempty"`
+	Images     []Image     `json:"images,omitempty"`
+	Tables     []Table     `json:"tables,omitempty"`
+	References []Reference `json:"references,omitempty"`
+}
+
 type ItemMetadata struct {
 	Title           string   `json:"title,omitempty"`
 	Authors         []string `json:"authors,omitempty"`
@@ -23,8 +30,9 @@ type Reference struct {
 }
 
 type Image struct {
-	ImageURL string `json:"image_url,omitempty"`
-	Caption  string `json:"caption,omitempty"`
+	ImageURL         string `json:"image_url,omitempty"`
+	ImageDescription string `json:"image_description,omitempty"`
+	Caption          string `json:"caption,omitempty"`
 }
 
 type Table struct {
@@ -32,3 +40,7 @@ type Table struct {
 	TableTitle string `json:"table_title,omitempty"`
 	TableData  string `json:"table_data,omitempty"`
 }
+
+type PdfData []byte
+type PdfPageData []byte
+type PdfPages []PdfPageData
