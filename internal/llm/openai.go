@@ -18,6 +18,32 @@ func ParsePDFPage(ctx context.Context, apiKey string, page *models.PdfPageData) 
 	outputSchema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
+			"metadata": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title": map[string]any{
+						"type": "string",
+					},
+					"authors": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "string"},
+					},
+					"publication_date": map[string]any{
+						"type": "string",
+					},
+					"publication": map[string]any{
+						"type": "string",
+					},
+					"doi": map[string]any{
+						"type": "string",
+					},
+					"abstract": map[string]any{
+						"type": "string",
+					},
+				},
+				"required":             []string{"title", "authors", "publication_date", "publication", "doi", "abstract"},
+				"additionalProperties": false,
+			},
 			"content": map[string]any{
 				"type": "string",
 			},
@@ -61,7 +87,7 @@ func ParsePDFPage(ctx context.Context, apiKey string, page *models.PdfPageData) 
 			},
 		},
 		"additionalProperties": false,
-		"required":             []string{"content", "references", "images", "tables"},
+		"required":             []string{"metadata", "content", "references", "images", "tables"},
 	}
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	encodedPageData := base64.StdEncoding.EncodeToString([]byte(*page))
@@ -77,7 +103,7 @@ func ParsePDFPage(ctx context.Context, apiKey string, page *models.PdfPageData) 
 								Filename: openai.String("page.pdf"),
 							},
 						},
-						responses.ResponseInputContentParamOfInputText(`Parse this page from an academic paper and extract it into the specified JSON structure. 1. Extract the main textual content of the page. This should exclude, any headers, footers, image captions, tables, and any other elements not part of the main content. Any columns should be concatenated in normal reading order. 2. If there are any bibliographic references (not in-text citations, but full bibliographic entries), extract those into the "references" array. 3. If there are any images on the page, extract the captions and textual descriptions of those images into the "images" array. 4. If there are any tables on the page, extract the table IDs, titles, and data into the "tables" array.`),
+						responses.ResponseInputContentParamOfInputText(`Parse this page from an academic paper and extract it into the specified JSON structure. 1. If there is document metadata on the page (title, authors, publication date, publication, doi, abstract), extract those into the "metadata" object. 2. Extract the main textual content of the page. This should exclude, any headers, footers, image captions, tables, and any other elements not part of the main content. Any columns should be concatenated in normal reading order. 3. If there are any bibliographic references (not in-text citations, but full bibliographic entries), extract those into the "references" array. 4. If there are any images on the page, extract the captions and textual descriptions of those images into the "images" array. 5. If there are any tables on the page, extract the table IDs, titles, and data into the "tables" array.`),
 					},
 					"user",
 				),
@@ -148,6 +174,25 @@ func ParsePDF(ctx context.Context, apiKey string, pdfData models.PdfData) (*mode
 	// Aggregate data from all pages
 	for _, page := range parsedPages {
 		if page != nil {
+			if page.Metadata.Title != "" && parsedItem.Metadata.Title == "" {
+				parsedItem.Metadata.Title = page.Metadata.Title
+			}
+			if len(page.Metadata.Authors) > 0 && len(parsedItem.Metadata.Authors) == 0 {
+				parsedItem.Metadata.Authors = page.Metadata.Authors
+			}
+			if page.Metadata.PublicationDate != "" && parsedItem.Metadata.PublicationDate == "" {
+				parsedItem.Metadata.PublicationDate = page.Metadata.PublicationDate
+			}
+			if page.Metadata.Publication != "" && parsedItem.Metadata.Publication == "" {
+				parsedItem.Metadata.Publication = page.Metadata.Publication
+			}
+			if page.Metadata.DOI != "" && parsedItem.Metadata.DOI == "" {
+				parsedItem.Metadata.DOI = page.Metadata.DOI
+			}
+			if page.Metadata.Abstract != "" && parsedItem.Metadata.Abstract == "" {
+				parsedItem.Metadata.Abstract = page.Metadata.Abstract
+			}
+
 			parsedItem.Pages = append(parsedItem.Pages, page.Content)
 			parsedItem.References = append(parsedItem.References, page.References...)
 			parsedItem.Images = append(parsedItem.Images, page.Images...)

@@ -1,6 +1,14 @@
 package server
 
 import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
+	"github.com/Epistemic-Technology/academic-mcp/resources"
 	"github.com/Epistemic-Technology/academic-mcp/tools"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -8,6 +16,147 @@ import (
 func CreateServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "academic-mcp", Version: "v0.0.1"}, nil)
 
-	mcp.AddTool(server, tools.PDFParseTool(), tools.PDFParseToolHandler)
+	// Initialize storage
+	store, err := initializeStorage()
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+
+	// Create resource handler
+	pdfResourceHandler := resources.NewPDFResourceHandler(store)
+
+	// Register tools with storage dependency
+	mcp.AddTool(server, tools.PDFParseTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.PDFParseQuery) (*mcp.CallToolResult, *tools.PDFParseResponse, error) {
+		return tools.PDFParseToolHandler(ctx, req, query, store)
+	})
+
+	// Register resource templates for PDF documents
+	// Template for document summary
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}",
+		Name:        "pdf-document",
+		Description: "Parsed PDF document with metadata and content summary",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for metadata
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/metadata",
+		Name:        "pdf-metadata",
+		Description: "Document metadata including title, authors, DOI, and abstract",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for pages
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/pages",
+		Name:        "pdf-pages",
+		Description: "All pages of the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual page
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/pages/{pageIndex}",
+		Name:        "pdf-page",
+		Description: "A specific page from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for references
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/references",
+		Name:        "pdf-references",
+		Description: "All references cited in the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual reference
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/references/{referenceIndex}",
+		Name:        "pdf-reference",
+		Description: "A specific reference from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for images
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/images",
+		Name:        "pdf-images",
+		Description: "All images from the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual image
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/images/{imageIndex}",
+		Name:        "pdf-image",
+		Description: "A specific image from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for tables
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/tables",
+		Name:        "pdf-tables",
+		Description: "All tables from the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual table
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/tables/{tableIndex}",
+		Name:        "pdf-table",
+		Description: "A specific table from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
 	return server
+}
+
+// initializeStorage creates and initializes the storage backend
+func initializeStorage() (storage.Store, error) {
+	// Determine database path
+	dbPath := os.Getenv("ACADEMIC_MCP_DB_PATH")
+	if dbPath == "" {
+		// Default to ~/.academic-mcp/academic.db
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		dbDir := filepath.Join(homeDir, ".academic-mcp")
+		if err := os.MkdirAll(dbDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		}
+		dbPath = filepath.Join(dbDir, "academic.db")
+	}
+
+	log.Printf("Initializing SQLite database at: %s", dbPath)
+
+	store, err := storage.NewSQLiteStore(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SQLite store: %w", err)
+	}
+
+	return store, nil
 }

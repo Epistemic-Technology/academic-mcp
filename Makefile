@@ -21,7 +21,7 @@ test: ## Run tests
 
 cc-add-mcp: ## Add local MCP server to Claude Code
 	@echo "Adding academic-mcp server to Claude Code configuration..."
-	@BINARY_PATH=$$(pwd)/$(BINARY_DIR)/academc-mcp-local-server; \
+	@BINARY_PATH=$$(pwd)/$(BINARY_DIR)/academic-mcp-local-server; \
 	if [ ! -f "$$BINARY_PATH" ]; then \
 		echo "Binary not found. Building first..."; \
 		$(MAKE) build; \
@@ -29,4 +29,4 @@ cc-add-mcp: ## Add local MCP server to Claude Code
 	claude mcp add academic-mcp --scope project -- "$$BINARY_PATH"
 
 inspect: ## Run the MCP inspector on local server
-	npx @modelcontextprotocol/inspector $(PWD)/$(BINARY_DIR)/academc-mcp-local-server
+	npx @modelcontextprotocol/inspector $(PWD)/$(BINARY_DIR)/academic-mcp-local-server

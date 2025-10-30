@@ -2,7 +2,7 @@
   "mcpServers": {
     "academic-mcp": {
       "type": "stdio",
-      "command": "/Users/mikethicke/github/academic-mcp/bin/academc-mcp-local-server",
+      "command": "/Users/mikethicke/github/academic-mcp/bin/academic-mcp-local-server",
       "args": [],
       "env": {}
     }

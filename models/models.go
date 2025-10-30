@@ -9,10 +9,11 @@ type ParsedItem struct {
 }
 
 type ParsedPage struct {
-	Content    string      `json:"content,omitempty"`
-	Images     []Image     `json:"images,omitempty"`
-	Tables     []Table     `json:"tables,omitempty"`
-	References []Reference `json:"references,omitempty"`
+	Metadata   ItemMetadata `json:"metadata,omitempty"`
+	Content    string       `json:"content,omitempty"`
+	Images     []Image      `json:"images,omitempty"`
+	Tables     []Table      `json:"tables,omitempty"`
+	References []Reference  `json:"references,omitempty"`
 }
 
 type ItemMetadata struct {
@@ -44,3 +45,18 @@ type Table struct {
 type PdfData []byte
 type PdfPageData []byte
 type PdfPages []PdfPageData
+
+// SourceInfo contains information about where the PDF came from
+type SourceInfo struct {
+	ZoteroID string `json:"zotero_id,omitempty"`
+	URL      string `json:"url,omitempty"`
+}
+
+// DocumentInfo contains basic information about a stored document
+type DocumentInfo struct {
+	DocumentID string     `json:"document_id"`
+	Title      string     `json:"title,omitempty"`
+	Authors    []string   `json:"authors,omitempty"`
+	DOI        string     `json:"doi,omitempty"`
+	SourceInfo SourceInfo `json:"source_info,omitempty"`
+}
