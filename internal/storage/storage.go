@@ -14,11 +14,17 @@ type Store interface {
 	// GetMetadata retrieves metadata for a document by ID
 	GetMetadata(ctx context.Context, docID string) (*models.ItemMetadata, error)
 
-	// GetPage retrieves a specific page by document ID and page number (1-indexed)
+	// GetPage retrieves a specific page by document ID and page number (1-indexed sequential)
 	GetPage(ctx context.Context, docID string, pageNum int) (string, error)
+
+	// GetPageBySourceNumber retrieves a page by its source page number (e.g., "125", "iv")
+	GetPageBySourceNumber(ctx context.Context, docID string, sourcePageNum string) (string, error)
 
 	// GetPages retrieves all pages for a document
 	GetPages(ctx context.Context, docID string) ([]string, error)
+
+	// GetPageMapping returns a map of source page numbers to sequential page numbers
+	GetPageMapping(ctx context.Context, docID string) (map[string]int, error)
 
 	// GetReferences retrieves all references for a document
 	GetReferences(ctx context.Context, docID string) ([]models.Reference, error)
@@ -37,6 +43,18 @@ type Store interface {
 
 	// GetTable retrieves a specific table by index (0-indexed)
 	GetTable(ctx context.Context, docID string, tableIndex int) (*models.Table, error)
+
+	// GetFootnotes retrieves all footnotes for a document
+	GetFootnotes(ctx context.Context, docID string) ([]models.Footnote, error)
+
+	// GetFootnote retrieves a specific footnote by index (0-indexed)
+	GetFootnote(ctx context.Context, docID string, footnoteIndex int) (*models.Footnote, error)
+
+	// GetEndnotes retrieves all endnotes for a document
+	GetEndnotes(ctx context.Context, docID string) ([]models.Endnote, error)
+
+	// GetEndnote retrieves a specific endnote by index (0-indexed)
+	GetEndnote(ctx context.Context, docID string, endnoteIndex int) (*models.Endnote, error)
 
 	// ListDocuments returns a list of all stored document IDs with their metadata
 	ListDocuments(ctx context.Context) ([]models.DocumentInfo, error)

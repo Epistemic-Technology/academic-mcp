@@ -76,24 +76,68 @@ The parsing process:
 2. Splits PDF into individual pages using `pdfcpu` library
 3. Processes pages **in parallel** with goroutines (see `internal/llm/openai.go:ParsePDF`)
 4. For each page, sends to OpenAI Responses API with GPT-5 Mini model
-5. Uses structured output (JSON schema) to extract per-page data
-6. Aggregates results from all pages into a single `models.ParsedItem`
-7. Stores in SQLite database with generated document ID
-8. Returns document ID and resource URIs for accessing content
+5. Uses structured output (JSON schema) to extract per-page data, including:
+   - Document metadata (title, authors, DOI, etc.)
+   - Main text content
+   - References, images, tables, footnotes, and endnotes
+   - **Page numbering information** (printed page numbers with confidence scores)
+6. Validates detected page numbers with conservative heuristics:
+   - Requires 60%+ coverage with high confidence (≥0.7)
+   - Checks for monotonicity (allowing small gaps for unnumbered pages)
+   - Interpolates missing page numbers where possible
+   - Falls back to sequential 1-n numbering if validation fails
+7. Aggregates results from all pages into a single `models.ParsedItem`
+8. Stores in SQLite database with both sequential and source page numbers
+9. Returns document ID and resource URIs for accessing content
+
+### Page Numbering System
+
+The system intelligently detects and uses source page numbers (e.g., journal article pages 125-150) when reliable:
+
+**Detection Strategy:**
+- LLM extracts printed page numbers from headers, footers, and margins
+- Provides confidence scores (0.0-1.0) for each detection
+- Captures page range information from title pages
+
+**Validation (Conservative Approach):**
+- Only uses source numbers if 60%+ of pages have confident detections
+- Verifies monotonic increase with tolerance for unnumbered pages
+- Allows up to 20% violations (e.g., for chapter breaks)
+- Prefers false negatives over false positives
+
+**Storage:**
+- `pages` table stores both `page_number` (sequential 1-n) and `source_page_number`
+- Sequential numbers guarantee stable internal references
+- Source numbers enable natural academic references
+
+**Access Patterns:**
+- `GetPage(docID, n)` - Get page by sequential number (1-indexed)
+- `GetPageBySourceNumber(docID, "125")` - Get page by source number
+- `GetPageMapping(docID)` - Get mapping between source and sequential numbers
+
+See `internal/llm/openai.go:validatePageNumbers()` for validation logic.
 
 ### Resource URI System
 
 After parsing, document content is accessible via standardized URIs:
 - `pdf://{docID}` - Document summary with counts
 - `pdf://{docID}/metadata` - Title, authors, DOI, abstract, etc.
-- `pdf://{docID}/pages` - All page content
-- `pdf://{docID}/pages/{pageIndex}` - Specific page (0-indexed)
+- `pdf://{docID}/pages` - All page content with both sequential and source page numbers
+- `pdf://{docID}/pages/{sourcePageNumber}` - Specific page by source number (e.g., `pages/125` for journal page 125)
 - `pdf://{docID}/references` - All bibliographic references
 - `pdf://{docID}/references/{refIndex}` - Specific reference (0-indexed)
 - `pdf://{docID}/images` - All images with captions
 - `pdf://{docID}/images/{imageIndex}` - Specific image (0-indexed)
 - `pdf://{docID}/tables` - All tables with structured data
 - `pdf://{docID}/tables/{tableIndex}` - Specific table (0-indexed)
+- `pdf://{docID}/footnotes` - All footnotes from the document
+- `pdf://{docID}/footnotes/{footnoteIndex}` - Specific footnote (0-indexed)
+- `pdf://{docID}/endnotes` - All endnotes from the document
+- `pdf://{docID}/endnotes/{endnoteIndex}` - Specific endnote (0-indexed)
+
+**Note:** Pages are accessed by their source page numbers (when detected) rather than sequential indices. For example, if a journal article spans pages 125-150, use `pdf://{docID}/pages/125` not `pdf://{docID}/pages/0`. The `/pages` resource shows the mapping between source and sequential numbers.
+
+**Footnotes vs Endnotes:** Footnotes appear at the bottom of the page where their marker is referenced, while endnotes are collected in a dedicated section at the end of chapters or documents. The LLM distinguishes between these during parsing.
 
 ### Adding New Tools
 

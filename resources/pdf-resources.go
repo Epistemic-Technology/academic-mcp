@@ -78,6 +78,22 @@ func (h *PDFResourceHandler) ListResources(ctx context.Context) ([]mcp.Resource,
 			Description: "All tables from the document",
 			MIMEType:    "application/json",
 		})
+
+		// Add footnotes resource
+		resources = append(resources, mcp.Resource{
+			URI:         fmt.Sprintf("pdf://%s/footnotes", doc.DocumentID),
+			Name:        fmt.Sprintf("%s (Footnotes)", doc.Title),
+			Description: "All footnotes from the document",
+			MIMEType:    "application/json",
+		})
+
+		// Add endnotes resource
+		resources = append(resources, mcp.Resource{
+			URI:         fmt.Sprintf("pdf://%s/endnotes", doc.DocumentID),
+			Name:        fmt.Sprintf("%s (Endnotes)", doc.Title),
+			Description: "All endnotes from the document",
+			MIMEType:    "application/json",
+		})
 	}
 
 	return resources, nil
@@ -122,8 +138,10 @@ func (h *PDFResourceHandler) ReadResource(ctx context.Context, uri string) (*mcp
 	case "metadata":
 		content, err = h.getMetadata(ctx, docID)
 	case "pages":
-		if index >= 0 {
-			content, err = h.getPage(ctx, docID, index)
+		if len(parts) > 2 {
+			// Try to get page by source page number (e.g., "125" or "iv")
+			pageIdentifier := parts[2]
+			content, err = h.getPageByIdentifier(ctx, docID, pageIdentifier)
 		} else {
 			content, err = h.getAllPages(ctx, docID)
 		}
@@ -144,6 +162,18 @@ func (h *PDFResourceHandler) ReadResource(ctx context.Context, uri string) (*mcp
 			content, err = h.getTable(ctx, docID, index)
 		} else {
 			content, err = h.getAllTables(ctx, docID)
+		}
+	case "footnotes":
+		if index >= 0 {
+			content, err = h.getFootnote(ctx, docID, index)
+		} else {
+			content, err = h.getAllFootnotes(ctx, docID)
+		}
+	case "endnotes":
+		if index >= 0 {
+			content, err = h.getEndnote(ctx, docID, index)
+		} else {
+			content, err = h.getAllEndnotes(ctx, docID)
 		}
 	default:
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
@@ -192,19 +222,33 @@ func (h *PDFResourceHandler) getDocumentSummary(ctx context.Context, docID strin
 		return "", err
 	}
 
+	footnotes, err := h.store.GetFootnotes(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
+	endnotes, err := h.store.GetEndnotes(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
 	summary := map[string]interface{}{
-		"document_id": docID,
-		"metadata":    metadata,
-		"page_count":  len(pages),
-		"ref_count":   len(refs),
-		"image_count": len(images),
-		"table_count": len(tables),
+		"document_id":    docID,
+		"metadata":       metadata,
+		"page_count":     len(pages),
+		"ref_count":      len(refs),
+		"image_count":    len(images),
+		"table_count":    len(tables),
+		"footnote_count": len(footnotes),
+		"endnote_count":  len(endnotes),
 		"available_resources": []string{
 			fmt.Sprintf("pdf://%s/metadata", docID),
 			fmt.Sprintf("pdf://%s/pages", docID),
 			fmt.Sprintf("pdf://%s/references", docID),
 			fmt.Sprintf("pdf://%s/images", docID),
 			fmt.Sprintf("pdf://%s/tables", docID),
+			fmt.Sprintf("pdf://%s/footnotes", docID),
+			fmt.Sprintf("pdf://%s/endnotes", docID),
 		},
 	}
 
@@ -249,15 +293,69 @@ func (h *PDFResourceHandler) getPage(ctx context.Context, docID string, pageNum 
 	return string(data), nil
 }
 
+// getPageByIdentifier retrieves a page by source page number (e.g., "125", "iv")
+func (h *PDFResourceHandler) getPageByIdentifier(ctx context.Context, docID string, pageIdentifier string) (string, error) {
+	// Try to get page by source page number
+	content, err := h.store.GetPageBySourceNumber(ctx, docID, pageIdentifier)
+	if err != nil {
+		return "", err
+	}
+
+	result := map[string]interface{}{
+		"source_page_number": pageIdentifier,
+		"content":            content,
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal page: %w", err)
+	}
+
+	return string(data), nil
+}
+
 func (h *PDFResourceHandler) getAllPages(ctx context.Context, docID string) (string, error) {
 	pages, err := h.store.GetPages(ctx, docID)
 	if err != nil {
 		return "", err
 	}
 
+	// Get page mapping to include source page numbers
+	mapping, err := h.store.GetPageMapping(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
+	// Build reverse mapping (sequential -> source)
+	reverseMapping := make(map[int]string)
+	for source, seq := range mapping {
+		reverseMapping[seq] = source
+	}
+
+	// Build page list with both sequential and source numbers
+	type pageInfo struct {
+		SequentialNumber int    `json:"sequential_number"`
+		SourcePageNumber string `json:"source_page_number"`
+		Content          string `json:"content"`
+	}
+
+	pageList := make([]pageInfo, len(pages))
+	for i, content := range pages {
+		sourceNum := reverseMapping[i+1] // i+1 because pages are 1-indexed in DB
+		if sourceNum == "" {
+			sourceNum = fmt.Sprintf("%d", i+1)
+		}
+		pageList[i] = pageInfo{
+			SequentialNumber: i + 1,
+			SourcePageNumber: sourceNum,
+			Content:          content,
+		}
+	}
+
 	result := map[string]interface{}{
 		"page_count": len(pages),
-		"pages":      pages,
+		"pages":      pageList,
+		"note":       "Access individual pages using source page numbers, e.g., pdf://" + docID + "/pages/125",
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
@@ -362,6 +460,72 @@ func (h *PDFResourceHandler) getAllTables(ctx context.Context, docID string) (st
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal tables: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (h *PDFResourceHandler) getFootnote(ctx context.Context, docID string, footnoteIndex int) (string, error) {
+	footnote, err := h.store.GetFootnote(ctx, docID, footnoteIndex)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := json.MarshalIndent(footnote, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal footnote: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (h *PDFResourceHandler) getAllFootnotes(ctx context.Context, docID string) (string, error) {
+	footnotes, err := h.store.GetFootnotes(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
+	result := map[string]interface{}{
+		"footnote_count": len(footnotes),
+		"footnotes":      footnotes,
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal footnotes: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (h *PDFResourceHandler) getEndnote(ctx context.Context, docID string, endnoteIndex int) (string, error) {
+	endnote, err := h.store.GetEndnote(ctx, docID, endnoteIndex)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := json.MarshalIndent(endnote, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal endnote: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (h *PDFResourceHandler) getAllEndnotes(ctx context.Context, docID string) (string, error) {
+	endnotes, err := h.store.GetEndnotes(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
+	result := map[string]interface{}{
+		"endnote_count": len(endnotes),
+		"endnotes":      endnotes,
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal endnotes: %w", err)
 	}
 
 	return string(data), nil

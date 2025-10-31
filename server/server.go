@@ -131,6 +131,46 @@ func CreateServer() *mcp.Server {
 		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
 	})
 
+	// Template for footnotes
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/footnotes",
+		Name:        "pdf-footnotes",
+		Description: "All footnotes from the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual footnote
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/footnotes/{footnoteIndex}",
+		Name:        "pdf-footnote",
+		Description: "A specific footnote from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for endnotes
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/endnotes",
+		Name:        "pdf-endnotes",
+		Description: "All endnotes from the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual endnote
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/endnotes/{endnoteIndex}",
+		Name:        "pdf-endnote",
+		Description: "A specific endnote from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
 	return server
 }
 

@@ -51,10 +51,13 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE TABLE IF NOT EXISTS pages (
 		document_id TEXT NOT NULL,
 		page_number INTEGER NOT NULL,
+		source_page_number TEXT NOT NULL,
 		content TEXT,
 		PRIMARY KEY (document_id, page_number),
 		FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
 	);
+
+	CREATE INDEX IF NOT EXISTS idx_pages_source_number ON pages(document_id, source_page_number);
 
 	CREATE TABLE IF NOT EXISTS document_references (
 		document_id TEXT NOT NULL,
@@ -82,6 +85,27 @@ func (s *SQLiteStore) initSchema() error {
 		table_title TEXT,
 		table_data TEXT,
 		PRIMARY KEY (document_id, table_index),
+		FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS footnotes (
+		document_id TEXT NOT NULL,
+		footnote_index INTEGER NOT NULL,
+		marker TEXT,
+		text TEXT,
+		page_number TEXT,
+		in_text_page TEXT,
+		PRIMARY KEY (document_id, footnote_index),
+		FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS endnotes (
+		document_id TEXT NOT NULL,
+		endnote_index INTEGER NOT NULL,
+		marker TEXT,
+		text TEXT,
+		page_number TEXT,
+		PRIMARY KEY (document_id, endnote_index),
 		FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
 	);
 
@@ -122,10 +146,15 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 
 	// Store pages
 	for i, pageContent := range item.Pages {
+		sourcePageNum := fmt.Sprintf("%d", i+1) // Default to sequential numbering
+		if i < len(item.PageNumbers) && item.PageNumbers[i] != "" {
+			sourcePageNum = item.PageNumbers[i]
+		}
+
 		_, err = tx.ExecContext(ctx, `
-			INSERT OR REPLACE INTO pages (document_id, page_number, content)
-			VALUES (?, ?, ?)
-		`, docID, i+1, pageContent)
+			INSERT OR REPLACE INTO pages (document_id, page_number, source_page_number, content)
+			VALUES (?, ?, ?, ?)
+		`, docID, i+1, sourcePageNum, pageContent)
 		if err != nil {
 			return "", fmt.Errorf("failed to insert page %d: %w", i+1, err)
 		}
@@ -164,6 +193,28 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 		}
 	}
 
+	// Store footnotes
+	for i, footnote := range item.Footnotes {
+		_, err = tx.ExecContext(ctx, `
+			INSERT OR REPLACE INTO footnotes (document_id, footnote_index, marker, text, page_number, in_text_page)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, docID, i, footnote.Marker, footnote.Text, footnote.PageNumber, footnote.InTextPage)
+		if err != nil {
+			return "", fmt.Errorf("failed to insert footnote %d: %w", i, err)
+		}
+	}
+
+	// Store endnotes
+	for i, endnote := range item.Endnotes {
+		_, err = tx.ExecContext(ctx, `
+			INSERT OR REPLACE INTO endnotes (document_id, endnote_index, marker, text, page_number)
+			VALUES (?, ?, ?, ?, ?)
+		`, docID, i, endnote.Marker, endnote.Text, endnote.PageNumber)
+		if err != nil {
+			return "", fmt.Errorf("failed to insert endnote %d: %w", i, err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return "", fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -197,7 +248,7 @@ func (s *SQLiteStore) GetMetadata(ctx context.Context, docID string) (*models.It
 	return &metadata, nil
 }
 
-// GetPage retrieves a specific page by document ID and page number (1-indexed)
+// GetPage retrieves a specific page by document ID and page number (1-indexed sequential)
 func (s *SQLiteStore) GetPage(ctx context.Context, docID string, pageNum int) (string, error) {
 	var content string
 	err := s.db.QueryRowContext(ctx, `
@@ -213,6 +264,53 @@ func (s *SQLiteStore) GetPage(ctx context.Context, docID string, pageNum int) (s
 	}
 
 	return content, nil
+}
+
+// GetPageBySourceNumber retrieves a page by its source page number (e.g., "125", "iv")
+func (s *SQLiteStore) GetPageBySourceNumber(ctx context.Context, docID string, sourcePageNum string) (string, error) {
+	var content string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT content FROM pages
+		WHERE document_id = ? AND source_page_number = ?
+	`, docID, sourcePageNum).Scan(&content)
+
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("page not found: %s source page %s", docID, sourcePageNum)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to query page by source number: %w", err)
+	}
+
+	return content, nil
+}
+
+// GetPageMapping returns a map of source page numbers to sequential page numbers
+func (s *SQLiteStore) GetPageMapping(ctx context.Context, docID string) (map[string]int, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT source_page_number, page_number FROM pages
+		WHERE document_id = ?
+		ORDER BY page_number
+	`, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query page mapping: %w", err)
+	}
+	defer rows.Close()
+
+	mapping := make(map[string]int)
+	for rows.Next() {
+		var sourcePageNum string
+		var pageNum int
+		if err := rows.Scan(&sourcePageNum, &pageNum); err != nil {
+			return nil, fmt.Errorf("failed to scan page mapping: %w", err)
+		}
+		mapping[sourcePageNum] = pageNum
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating page mapping: %w", err)
+	}
+
+	return mapping, nil
 }
 
 // GetPages retrieves all pages for a document
@@ -379,6 +477,98 @@ func (s *SQLiteStore) GetTable(ctx context.Context, docID string, tableIndex int
 	}
 
 	return &tbl, nil
+}
+
+// GetFootnotes retrieves all footnotes for a document
+func (s *SQLiteStore) GetFootnotes(ctx context.Context, docID string) ([]models.Footnote, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT marker, text, page_number, in_text_page FROM footnotes
+		WHERE document_id = ?
+		ORDER BY footnote_index
+	`, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footnotes: %w", err)
+	}
+	defer rows.Close()
+
+	var footnotes []models.Footnote
+	for rows.Next() {
+		var fn models.Footnote
+		if err := rows.Scan(&fn.Marker, &fn.Text, &fn.PageNumber, &fn.InTextPage); err != nil {
+			return nil, fmt.Errorf("failed to scan footnote: %w", err)
+		}
+		footnotes = append(footnotes, fn)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating footnotes: %w", err)
+	}
+
+	return footnotes, nil
+}
+
+// GetFootnote retrieves a specific footnote by index (0-indexed)
+func (s *SQLiteStore) GetFootnote(ctx context.Context, docID string, footnoteIndex int) (*models.Footnote, error) {
+	var fn models.Footnote
+	err := s.db.QueryRowContext(ctx, `
+		SELECT marker, text, page_number, in_text_page FROM footnotes
+		WHERE document_id = ? AND footnote_index = ?
+	`, docID, footnoteIndex).Scan(&fn.Marker, &fn.Text, &fn.PageNumber, &fn.InTextPage)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("footnote not found: %s index %d", docID, footnoteIndex)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footnote: %w", err)
+	}
+
+	return &fn, nil
+}
+
+// GetEndnotes retrieves all endnotes for a document
+func (s *SQLiteStore) GetEndnotes(ctx context.Context, docID string) ([]models.Endnote, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT marker, text, page_number FROM endnotes
+		WHERE document_id = ?
+		ORDER BY endnote_index
+	`, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query endnotes: %w", err)
+	}
+	defer rows.Close()
+
+	var endnotes []models.Endnote
+	for rows.Next() {
+		var en models.Endnote
+		if err := rows.Scan(&en.Marker, &en.Text, &en.PageNumber); err != nil {
+			return nil, fmt.Errorf("failed to scan endnote: %w", err)
+		}
+		endnotes = append(endnotes, en)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating endnotes: %w", err)
+	}
+
+	return endnotes, nil
+}
+
+// GetEndnote retrieves a specific endnote by index (0-indexed)
+func (s *SQLiteStore) GetEndnote(ctx context.Context, docID string, endnoteIndex int) (*models.Endnote, error) {
+	var en models.Endnote
+	err := s.db.QueryRowContext(ctx, `
+		SELECT marker, text, page_number FROM endnotes
+		WHERE document_id = ? AND endnote_index = ?
+	`, docID, endnoteIndex).Scan(&en.Marker, &en.Text, &en.PageNumber)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("endnote not found: %s index %d", docID, endnoteIndex)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query endnote: %w", err)
+	}
+
+	return &en, nil
 }
 
 // ListDocuments returns a list of all stored document IDs with their metadata

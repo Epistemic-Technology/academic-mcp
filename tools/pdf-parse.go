@@ -22,13 +22,13 @@ type PDFParseQuery struct {
 }
 
 type PDFParseResponse struct {
-	DocumentID   string `json:"document_id"`
-	ResourcePath string `json:"resource_path"`
-	Title        string `json:"title,omitempty"`
-	PageCount    int    `json:"page_count"`
-	RefCount     int    `json:"reference_count"`
-	ImageCount   int    `json:"image_count"`
-	TableCount   int    `json:"table_count"`
+	DocumentID    string   `json:"document_id"`
+	ResourcePaths []string `json:"resource_paths"`
+	Title         string   `json:"title,omitempty"`
+	PageCount     int      `json:"page_count"`
+	RefCount      int      `json:"reference_count"`
+	ImageCount    int      `json:"image_count"`
+	TableCount    int      `json:"table_count"`
 }
 
 func PDFParseTool() *mcp.Tool {
@@ -89,57 +89,70 @@ func PDFParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query PD
 		return nil, nil, fmt.Errorf("failed to store parsed item: %w", err)
 	}
 
-	// Format authors string
-	authorsStr := "Unknown"
-	if len(parsedItem.Metadata.Authors) > 0 {
-		if len(parsedItem.Metadata.Authors) == 1 {
-			authorsStr = parsedItem.Metadata.Authors[0]
-		} else if len(parsedItem.Metadata.Authors) <= 3 {
-			authorsStr = fmt.Sprintf("%s", parsedItem.Metadata.Authors)
-		} else {
-			authorsStr = fmt.Sprintf("%s et al.", parsedItem.Metadata.Authors[0])
-		}
+	// Build list of available resource paths
+	resourcePaths := []string{
+		fmt.Sprintf("pdf://%s", docID),
+		fmt.Sprintf("pdf://%s/metadata", docID),
+		fmt.Sprintf("pdf://%s/pages", docID),
 	}
 
-	// Format publication date
-	pubDateStr := ""
-	if parsedItem.Metadata.PublicationDate != "" {
-		pubDateStr = fmt.Sprintf(" (%s)", parsedItem.Metadata.PublicationDate)
+	// Add first and last page paths to indicate page numbering scheme
+	if len(parsedItem.PageNumbers) > 0 {
+		firstPage := parsedItem.PageNumbers[0]
+		lastPage := parsedItem.PageNumbers[len(parsedItem.PageNumbers)-1]
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/pages/%s", docID, firstPage),
+			fmt.Sprintf("pdf://%s/pages/%s", docID, lastPage),
+		)
 	}
 
-	// Format title
-	titleStr := parsedItem.Metadata.Title
-	if titleStr == "" {
-		titleStr = "Unknown Title"
+	// Add page template
+	resourcePaths = append(resourcePaths, fmt.Sprintf("pdf://%s/pages/{sourcePageNumber}", docID))
+
+	if len(parsedItem.References) > 0 {
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/references", docID),
+			fmt.Sprintf("pdf://%s/references/{refIndex}", docID),
+		)
 	}
 
-	// Create response message
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: fmt.Sprintf("Successfully parsed and stored PDF document (ID: %s)\n\nTitle: %s\nAuthors: %s%s\n\nExtracted metadata, %d pages, %d references, %d images, and %d tables.\n\nAccess content via resources:\n- pdf://%s/metadata\n- pdf://%s/pages\n- pdf://%s/references\n- pdf://%s/images\n- pdf://%s/tables",
-					docID,
-					titleStr,
-					authorsStr,
-					pubDateStr,
-					len(parsedItem.Pages),
-					len(parsedItem.References),
-					len(parsedItem.Images),
-					len(parsedItem.Tables),
-					docID, docID, docID, docID, docID),
-			},
-		},
+	if len(parsedItem.Images) > 0 {
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/images", docID),
+			fmt.Sprintf("pdf://%s/images/{imageIndex}", docID),
+		)
+	}
+
+	if len(parsedItem.Tables) > 0 {
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/tables", docID),
+			fmt.Sprintf("pdf://%s/tables/{tableIndex}", docID),
+		)
+	}
+
+	if len(parsedItem.Footnotes) > 0 {
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/footnotes", docID),
+			fmt.Sprintf("pdf://%s/footnotes/{footnoteIndex}", docID),
+		)
+	}
+
+	if len(parsedItem.Endnotes) > 0 {
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/endnotes", docID),
+			fmt.Sprintf("pdf://%s/endnotes/{endnoteIndex}", docID),
+		)
 	}
 
 	responseData := &PDFParseResponse{
-		DocumentID:   docID,
-		ResourcePath: fmt.Sprintf("pdf://%s", docID),
-		Title:        parsedItem.Metadata.Title,
-		PageCount:    len(parsedItem.Pages),
-		RefCount:     len(parsedItem.References),
-		ImageCount:   len(parsedItem.Images),
-		TableCount:   len(parsedItem.Tables),
+		DocumentID:    docID,
+		ResourcePaths: resourcePaths,
+		Title:         parsedItem.Metadata.Title,
+		PageCount:     len(parsedItem.Pages),
+		RefCount:      len(parsedItem.References),
+		ImageCount:    len(parsedItem.Images),
+		TableCount:    len(parsedItem.Tables),
 	}
 
-	return result, responseData, nil
+	return nil, responseData, nil
 }
