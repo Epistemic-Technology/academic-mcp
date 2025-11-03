@@ -16,13 +16,11 @@ import (
 func CreateServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "academic-mcp", Version: "v0.0.1"}, nil)
 
-	// Initialize storage
 	store, err := initializeStorage()
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
-	// Create resource handler
 	pdfResourceHandler := resources.NewPDFResourceHandler(store)
 
 	// Register tools with storage dependency
@@ -30,7 +28,10 @@ func CreateServer() *mcp.Server {
 		return tools.PDFParseToolHandler(ctx, req, query, store)
 	})
 
-	// Register resource templates for PDF documents
+	mcp.AddTool(server, tools.PDFSummarizeTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.PDFSummarizeQuery) (*mcp.CallToolResult, *tools.PDFSummarizeResponse, error) {
+		return tools.PDFSummarizeToolHandler(ctx, req, query, store)
+	})
+
 	// Template for document summary
 	server.AddResourceTemplate(&mcp.ResourceTemplate{
 		URITemplate: "pdf://{documentId}",

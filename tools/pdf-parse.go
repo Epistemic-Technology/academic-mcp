@@ -2,17 +2,12 @@ package tools
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"os"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/Epistemic-Technology/academic-mcp/internal/llm"
-	"github.com/Epistemic-Technology/academic-mcp/internal/pdf"
+	"github.com/Epistemic-Technology/academic-mcp/internal/operations"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
-	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
 type PDFParseQuery struct {
@@ -44,106 +39,16 @@ func PDFParseTool() *mcp.Tool {
 }
 
 func PDFParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query PDFParseQuery, store storage.Store) (*mcp.CallToolResult, *PDFParseResponse, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return nil, nil, errors.New("OPENAI_API_KEY environment variable not set")
-	}
-
-	var data models.PdfData
-	var err error
-	sourceInfo := &models.SourceInfo{
-		ZoteroID: query.ZoteroID,
-		URL:      query.URL,
-	}
-
-	if query.RawData != nil {
-		data = query.RawData
-	} else if query.ZoteroID != "" {
-		zoteroAPIKey := os.Getenv("ZOTERO_API_KEY")
-		libraryID := os.Getenv("ZOTERO_LIBRARY_ID")
-		data, err = pdf.GetFromZotero(ctx, query.ZoteroID, zoteroAPIKey, libraryID)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else if query.URL != "" {
-		data, err = pdf.GetFromURL(ctx, query.URL)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		return nil, nil, errors.New("no data provided")
-	}
-
-	if data == nil {
-		return nil, nil, errors.New("no data retrieved")
-	}
-
-	parsedItem, err := llm.ParsePDF(ctx, apiKey, data)
+	// Use the shared helper to get or parse the PDF document
+	docID, parsedItem, err := operations.GetOrParsePDF(ctx, query.ZoteroID, query.URL, query.RawData, store)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Store the parsed item in the database
-	docID, err := store.StoreParsedItem(ctx, parsedItem, sourceInfo)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to store parsed item: %w", err)
-	}
+	// Calculate resource paths for accessing the document content
+	resourcePaths := storage.CalculateResourcePaths(docID, parsedItem)
 
-	// Build list of available resource paths
-	resourcePaths := []string{
-		fmt.Sprintf("pdf://%s", docID),
-		fmt.Sprintf("pdf://%s/metadata", docID),
-		fmt.Sprintf("pdf://%s/pages", docID),
-	}
-
-	// Add first and last page paths to indicate page numbering scheme
-	if len(parsedItem.PageNumbers) > 0 {
-		firstPage := parsedItem.PageNumbers[0]
-		lastPage := parsedItem.PageNumbers[len(parsedItem.PageNumbers)-1]
-		resourcePaths = append(resourcePaths,
-			fmt.Sprintf("pdf://%s/pages/%s", docID, firstPage),
-			fmt.Sprintf("pdf://%s/pages/%s", docID, lastPage),
-		)
-	}
-
-	// Add page template
-	resourcePaths = append(resourcePaths, fmt.Sprintf("pdf://%s/pages/{sourcePageNumber}", docID))
-
-	if len(parsedItem.References) > 0 {
-		resourcePaths = append(resourcePaths,
-			fmt.Sprintf("pdf://%s/references", docID),
-			fmt.Sprintf("pdf://%s/references/{refIndex}", docID),
-		)
-	}
-
-	if len(parsedItem.Images) > 0 {
-		resourcePaths = append(resourcePaths,
-			fmt.Sprintf("pdf://%s/images", docID),
-			fmt.Sprintf("pdf://%s/images/{imageIndex}", docID),
-		)
-	}
-
-	if len(parsedItem.Tables) > 0 {
-		resourcePaths = append(resourcePaths,
-			fmt.Sprintf("pdf://%s/tables", docID),
-			fmt.Sprintf("pdf://%s/tables/{tableIndex}", docID),
-		)
-	}
-
-	if len(parsedItem.Footnotes) > 0 {
-		resourcePaths = append(resourcePaths,
-			fmt.Sprintf("pdf://%s/footnotes", docID),
-			fmt.Sprintf("pdf://%s/footnotes/{footnoteIndex}", docID),
-		)
-	}
-
-	if len(parsedItem.Endnotes) > 0 {
-		resourcePaths = append(resourcePaths,
-			fmt.Sprintf("pdf://%s/endnotes", docID),
-			fmt.Sprintf("pdf://%s/endnotes/{endnoteIndex}", docID),
-		)
-	}
-
+	// Format the response with document metadata and statistics
 	responseData := &PDFParseResponse{
 		DocumentID:    docID,
 		ResourcePaths: resourcePaths,

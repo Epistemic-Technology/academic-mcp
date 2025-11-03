@@ -117,21 +117,18 @@ func (s *SQLiteStore) initSchema() error {
 	return err
 }
 
-// StoreParsedItem stores a parsed PDF and returns a unique document ID
-func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedItem, sourceInfo *models.SourceInfo) (string, error) {
-	// Generate document ID based on source info
-	docID := generateDocumentID(item, sourceInfo)
-
+// StoreParsedItem stores a parsed PDF with the provided document ID
+func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *models.ParsedItem, sourceInfo *models.SourceInfo) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
 	// Store metadata
 	authorsJSON, err := json.Marshal(item.Metadata.Authors)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal authors: %w", err)
+		return fmt.Errorf("failed to marshal authors: %w", err)
 	}
 
 	_, err = tx.ExecContext(ctx, `
@@ -141,7 +138,7 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 		item.Metadata.Publication, item.Metadata.DOI, item.Metadata.Abstract,
 		sourceInfo.ZoteroID, sourceInfo.URL)
 	if err != nil {
-		return "", fmt.Errorf("failed to insert document: %w", err)
+		return fmt.Errorf("failed to insert document: %w", err)
 	}
 
 	// Store pages
@@ -156,7 +153,7 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 			VALUES (?, ?, ?, ?)
 		`, docID, i+1, sourcePageNum, pageContent)
 		if err != nil {
-			return "", fmt.Errorf("failed to insert page %d: %w", i+1, err)
+			return fmt.Errorf("failed to insert page %d: %w", i+1, err)
 		}
 	}
 
@@ -167,7 +164,7 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 			VALUES (?, ?, ?, ?)
 		`, docID, i, ref.ReferenceText, ref.DOI)
 		if err != nil {
-			return "", fmt.Errorf("failed to insert reference %d: %w", i, err)
+			return fmt.Errorf("failed to insert reference %d: %w", i, err)
 		}
 	}
 
@@ -178,7 +175,7 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 			VALUES (?, ?, ?, ?, ?)
 		`, docID, i, img.ImageURL, img.ImageDescription, img.Caption)
 		if err != nil {
-			return "", fmt.Errorf("failed to insert image %d: %w", i, err)
+			return fmt.Errorf("failed to insert image %d: %w", i, err)
 		}
 	}
 
@@ -189,7 +186,7 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 			VALUES (?, ?, ?, ?, ?)
 		`, docID, i, tbl.TableID, tbl.TableTitle, tbl.TableData)
 		if err != nil {
-			return "", fmt.Errorf("failed to insert table %d: %w", i, err)
+			return fmt.Errorf("failed to insert table %d: %w", i, err)
 		}
 	}
 
@@ -200,7 +197,7 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 			VALUES (?, ?, ?, ?, ?, ?)
 		`, docID, i, footnote.Marker, footnote.Text, footnote.PageNumber, footnote.InTextPage)
 		if err != nil {
-			return "", fmt.Errorf("failed to insert footnote %d: %w", i, err)
+			return fmt.Errorf("failed to insert footnote %d: %w", i, err)
 		}
 	}
 
@@ -211,15 +208,15 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, item *models.ParsedIt
 			VALUES (?, ?, ?, ?, ?)
 		`, docID, i, endnote.Marker, endnote.Text, endnote.PageNumber)
 		if err != nil {
-			return "", fmt.Errorf("failed to insert endnote %d: %w", i, err)
+			return fmt.Errorf("failed to insert endnote %d: %w", i, err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("failed to commit transaction: %w", err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return docID, nil
+	return nil
 }
 
 // GetMetadata retrieves metadata for a document by ID
@@ -625,37 +622,93 @@ func (s *SQLiteStore) DeleteDocument(ctx context.Context, docID string) error {
 	return nil
 }
 
+// DocumentExists checks if a document with the given ID already exists
+func (s *SQLiteStore) DocumentExists(ctx context.Context, docID string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM documents WHERE id = ?)`, docID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check document existence: %w", err)
+	}
+	return exists, nil
+}
+
+// GetParsedItem retrieves a complete ParsedItem for a document by ID
+func (s *SQLiteStore) GetParsedItem(ctx context.Context, docID string) (*models.ParsedItem, error) {
+	// Get metadata
+	metadata, err := s.GetMetadata(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metadata: %w", err)
+	}
+
+	// Get pages
+	pages, err := s.GetPages(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pages: %w", err)
+	}
+
+	// Get page mapping to reconstruct page numbers
+	pageMapping, err := s.GetPageMapping(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get page mapping: %w", err)
+	}
+
+	// Build PageNumbers array from mapping
+	pageNumbers := make([]string, len(pages))
+	for sourcePageNum, seqNum := range pageMapping {
+		if seqNum > 0 && seqNum <= len(pageNumbers) {
+			pageNumbers[seqNum-1] = sourcePageNum
+		}
+	}
+
+	// Get references
+	references, err := s.GetReferences(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get references: %w", err)
+	}
+
+	// Get images
+	images, err := s.GetImages(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images: %w", err)
+	}
+
+	// Get tables
+	tables, err := s.GetTables(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tables: %w", err)
+	}
+
+	// Get footnotes
+	footnotes, err := s.GetFootnotes(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get footnotes: %w", err)
+	}
+
+	// Get endnotes
+	endnotes, err := s.GetEndnotes(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get endnotes: %w", err)
+	}
+
+	// Construct and return ParsedItem
+	return &models.ParsedItem{
+		Metadata:    *metadata,
+		Pages:       pages,
+		PageNumbers: pageNumbers,
+		References:  references,
+		Images:      images,
+		Tables:      tables,
+		Footnotes:   footnotes,
+		Endnotes:    endnotes,
+	}, nil
+}
+
 // Close closes the database connection
 func (s *SQLiteStore) Close() error {
 	if s.db != nil {
 		return s.db.Close()
 	}
 	return nil
-}
-
-// generateDocumentID creates a unique document ID based on available information
-func generateDocumentID(item *models.ParsedItem, sourceInfo *models.SourceInfo) string {
-	if sourceInfo.ZoteroID != "" {
-		return "zotero_" + sourceInfo.ZoteroID
-	}
-	if item.Metadata.DOI != "" {
-		return "doi_" + item.Metadata.DOI
-	}
-	if sourceInfo.URL != "" {
-		// Use a hash of the URL for the ID
-		return fmt.Sprintf("url_%x", hashString(sourceInfo.URL))
-	}
-	// Fallback to a hash of the title
-	return fmt.Sprintf("title_%x", hashString(item.Metadata.Title))
-}
-
-// hashString creates a simple hash of a string
-func hashString(s string) uint32 {
-	var hash uint32
-	for i := 0; i < len(s); i++ {
-		hash = hash*31 + uint32(s[i])
-	}
-	return hash
 }
 
 // Ensure SQLiteStore implements Store interface

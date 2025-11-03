@@ -2,14 +2,33 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
+// GenerateDocumentID creates a unique document ID from source info and PDF data.
+// This function can be called before parsing to check if a document already exists.
+// Priority: Zotero ID > URL hash > PDF data hash
+func GenerateDocumentID(sourceInfo *models.SourceInfo, pdfData models.PdfData) string {
+	if sourceInfo.ZoteroID != "" {
+		return "zotero_" + sourceInfo.ZoteroID
+	}
+	if sourceInfo.URL != "" {
+		// Use SHA-256 hash of the URL
+		hash := sha256.Sum256([]byte(sourceInfo.URL))
+		return fmt.Sprintf("url_%x", hash[:8]) // Use first 8 bytes for shorter IDs
+	}
+	// Fallback to hash of PDF data
+	hash := sha256.Sum256(pdfData)
+	return fmt.Sprintf("data_%x", hash[:8])
+}
+
 // Store defines the interface for storing and retrieving parsed PDF data
 type Store interface {
-	// StoreParsedItem stores a parsed PDF and returns a unique document ID
-	StoreParsedItem(ctx context.Context, item *models.ParsedItem, sourceInfo *models.SourceInfo) (string, error)
+	// StoreParsedItem stores a parsed PDF with the provided document ID
+	StoreParsedItem(ctx context.Context, docID string, item *models.ParsedItem, sourceInfo *models.SourceInfo) error
 
 	// GetMetadata retrieves metadata for a document by ID
 	GetMetadata(ctx context.Context, docID string) (*models.ItemMetadata, error)
@@ -61,6 +80,12 @@ type Store interface {
 
 	// DeleteDocument removes a document and all associated data
 	DeleteDocument(ctx context.Context, docID string) error
+
+	// DocumentExists checks if a document with the given ID already exists
+	DocumentExists(ctx context.Context, docID string) (bool, error)
+
+	// GetParsedItem retrieves a complete ParsedItem for a document by ID
+	GetParsedItem(ctx context.Context, docID string) (*models.ParsedItem, error)
 
 	// Close closes the database connection
 	Close() error

@@ -3,13 +3,16 @@ package pdf
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
+	"os"
+
+	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 
 	"github.com/Epistemic-Technology/academic-mcp/models"
 	"github.com/Epistemic-Technology/zotero/zotero"
-	"github.com/pdfcpu/pdfcpu/pkg/api"
-	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
 
 func SplitPdf(pdf models.PdfData) (models.PdfPages, error) {
@@ -36,6 +39,32 @@ func SplitPdf(pdf models.PdfData) (models.PdfPages, error) {
 		pages = append(pages, models.PdfPageData(pageData))
 	}
 	return pages, nil
+}
+
+func GetData(ctx context.Context, sourceInfo models.SourceInfo) (models.PdfData, error) {
+	var data models.PdfData
+	var err error
+	if sourceInfo.ZoteroID != "" {
+		zoteroAPIKey := os.Getenv("ZOTERO_API_KEY")
+		libraryID := os.Getenv("ZOTERO_LIBRARY_ID")
+		data, err = GetFromZotero(ctx, sourceInfo.ZoteroID, zoteroAPIKey, libraryID)
+		if err != nil {
+			return nil, err
+		}
+	} else if sourceInfo.URL != "" {
+		data, err = GetFromURL(ctx, sourceInfo.URL)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New("no data provided")
+	}
+
+	if data == nil {
+		return nil, errors.New("no data retrieved")
+	}
+
+	return data, nil
 }
 
 func GetFromURL(ctx context.Context, url string) (models.PdfData, error) {

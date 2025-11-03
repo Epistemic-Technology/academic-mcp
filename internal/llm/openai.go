@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -301,4 +302,28 @@ func ParsePDF(ctx context.Context, apiKey string, pdfData models.PdfData) (*mode
 	}
 
 	return &parsedItem, nil
+}
+
+func SummarizeItem(ctx context.Context, apiKey string, pdfData *models.ParsedItem) (string, error) {
+	fullContent := strings.Join(pdfData.Pages, "\n")
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+		Model: shared.ChatModelGPT5Mini,
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage(
+					responses.ResponseInputMessageContentListParam{
+						responses.ResponseInputContentParamOfInputText(`Summarize this academic text into 1-3 paragraphs. It should be coherent, concise, accurately reflect the original content, and use a detached academic tone. This should be in expository prose, not point form. No lists, just coherent sentences and paragraphs.
+
+` + fullContent),
+					},
+					"user",
+				),
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return response.OutputText(), nil
 }
