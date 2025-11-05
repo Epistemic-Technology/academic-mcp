@@ -50,8 +50,10 @@ The codebase follows a clean layered architecture:
 4. **Storage Layer** (`internal/storage/`):
    - `storage.go`: Defines the `Store` interface for all storage operations
    - `sqlite.go`: SQLite implementation with document storage, retrieval, and indexing
-   - Stores metadata, pages, references, images, and tables in separate normalized tables
-   - Generates document IDs based on Zotero ID, DOI, URL hash, or title hash (in priority order)
+   - `resources.go`: Helper functions like `CalculateResourcePaths()` for generating resource URIs
+   - Stores metadata, pages, references, images, tables, footnotes, and endnotes in separate normalized tables
+   - Generates document IDs based on Zotero ID, URL hash, or PDF data hash (in priority order)
+   - Provides methods for checking document existence and retrieving complete parsed items
 
 5. **Resources Layer** (`resources/`):
    - `PDFResourceHandler` translates URI patterns to storage queries
@@ -59,8 +61,9 @@ The codebase follows a clean layered architecture:
    - Returns JSON-formatted content for all resource types
 
 6. **Internal Packages**:
-   - `internal/llm/`: OpenAI API integration using Responses API with structured outputs
+   - `internal/llm/`: OpenAI API integration using Responses API with structured outputs (parsing and summarization)
    - `internal/pdf/`: PDF utilities (splitting, fetching from URL/Zotero)
+   - `internal/operations/`: Shared business logic used across multiple tools
 
 7. **Models Layer** (`models/models.go`): Shared data structures used across all layers.
 
@@ -139,6 +142,38 @@ After parsing, document content is accessible via standardized URIs:
 
 **Footnotes vs Endnotes:** Footnotes appear at the bottom of the page where their marker is referenced, while endnotes are collected in a dedicated section at the end of chapters or documents. The LLM distinguishes between these during parsing.
 
+## Available Tools
+
+### pdf-parse
+Parses a PDF document and extracts structured data including metadata, content, references, images, tables, footnotes, and endnotes. The parsed document is stored in SQLite and accessible via resource URIs.
+
+**Input Parameters** (mutually exclusive):
+- `zotero_id`: Fetch PDF from Zotero library
+- `url`: Download PDF from URL
+- `raw_data`: Base64-encoded PDF bytes
+
+**Returns**: Document ID and resource URIs for accessing parsed content.
+
+### pdf-summarize
+Generates a concise 1-3 paragraph summary of a PDF document using GPT-5 Mini. If the document hasn't been parsed yet, it will automatically parse it first using `GetOrParsePDF()`. The summary uses a detached academic tone and expository prose.
+
+**Input Parameters** (mutually exclusive):
+- `zotero_id`: Fetch PDF from Zotero library
+- `url`: Download PDF from URL
+- `raw_data`: Base64-encoded PDF bytes
+
+**Returns**: Document ID, resource URIs, document title, and generated summary.
+
+### Shared Operations
+
+Both tools use the `internal/operations/GetOrParsePDF()` function, which:
+1. Generates a document ID from the source information
+2. Checks if the document already exists in storage
+3. If it exists, retrieves it; otherwise parses and stores it
+4. Returns the document ID and parsed item
+
+This pattern ensures documents are only parsed once and can be efficiently reused across multiple tools.
+
 ### Adding New Tools
 
 To add a new MCP tool:
@@ -168,6 +203,32 @@ To add a new MCP tool:
    })
    ```
 
+### Using GetOrParsePDF for Tool Development
+
+When creating tools that need parsed PDF documents, use `internal/operations/GetOrParsePDF()` to avoid duplicate parsing:
+
+```go
+import "github.com/Epistemic-Technology/academic-mcp/internal/operations"
+
+func MyToolHandler(ctx context.Context, req *mcp.CallToolRequest, query MyQuery, store storage.Store) (*mcp.CallToolResult, *MyResponse, error) {
+    // GetOrParsePDF handles fetching, parsing, and storage automatically
+    docID, parsedItem, err := operations.GetOrParsePDF(ctx, query.ZoteroID, query.URL, query.RawData, store)
+    if err != nil {
+        return nil, nil, err
+    }
+    
+    // Use parsedItem for your tool's specific functionality
+    // ...
+}
+```
+
+This pattern:
+- Automatically generates consistent document IDs
+- Checks if the document exists before parsing
+- Parses and stores new documents
+- Returns existing documents from storage
+- Handles all three input methods (Zotero, URL, raw data)
+
 ### Adding New Storage Methods
 
 If you need to add new storage capabilities:
@@ -176,6 +237,7 @@ If you need to add new storage capabilities:
 2. Implement method in `internal/storage/sqlite.go` for `SQLiteStore`
 3. Update schema in `initSchema()` if new tables are needed
 4. Add corresponding resource handler methods in `resources/pdf-resources.go` if exposing via URIs
+5. Update `CalculateResourcePaths()` in `internal/storage/resources.go` if adding new resource URI patterns
 
 ## Environment Variables
 
