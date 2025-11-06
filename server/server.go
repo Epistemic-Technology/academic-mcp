@@ -24,8 +24,8 @@ func CreateServer() *mcp.Server {
 	pdfResourceHandler := resources.NewPDFResourceHandler(store)
 
 	// Register tools with storage dependency
-	mcp.AddTool(server, tools.PDFParseTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.PDFParseQuery) (*mcp.CallToolResult, *tools.PDFParseResponse, error) {
-		return tools.PDFParseToolHandler(ctx, req, query, store)
+	mcp.AddTool(server, tools.DocumentParseTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.DocumentParseQuery) (*mcp.CallToolResult, *tools.DocumentParseResponse, error) {
+		return tools.DocumentParseToolHandler(ctx, req, query, store)
 	})
 
 	mcp.AddTool(server, tools.PDFSummarizeTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.PDFSummarizeQuery) (*mcp.CallToolResult, *tools.PDFSummarizeResponse, error) {

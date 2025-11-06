@@ -10,13 +10,14 @@ import (
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
 )
 
-type PDFParseQuery struct {
+type DocumentParseQuery struct {
 	ZoteroID string `json:"zotero_id,omitempty"`
 	URL      string `json:"url,omitempty"`
 	RawData  []byte `json:"raw_data,omitempty"`
+	DocType  string `json:"doc_type,omitempty"`
 }
 
-type PDFParseResponse struct {
+type DocumentParseResponse struct {
 	DocumentID    string   `json:"document_id"`
 	ResourcePaths []string `json:"resource_paths"`
 	Title         string   `json:"title,omitempty"`
@@ -26,21 +27,21 @@ type PDFParseResponse struct {
 	TableCount    int      `json:"table_count"`
 }
 
-func PDFParseTool() *mcp.Tool {
-	inputschema, err := jsonschema.For[PDFParseQuery](nil)
+func DocumentParseTool() *mcp.Tool {
+	inputschema, err := jsonschema.For[DocumentParseQuery](nil)
 	if err != nil {
 		panic(err)
 	}
 	return &mcp.Tool{
-		Name:        "pdf-parse",
-		Description: "Parse a PDF file using OpenAI's vision capabilities to extract structured data including metadata, content, references, images, and tables",
+		Name:        "document-parse",
+		Description: "Parse a document (PDF, HTML, Markdown, plain text, or DOCX) using OpenAI's vision capabilities to extract structured data including metadata, content, references, images, and tables. The document type is automatically detected, but can be overridden with the doc_type parameter.",
 		InputSchema: inputschema,
 	}
 }
 
-func PDFParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query PDFParseQuery, store storage.Store) (*mcp.CallToolResult, *PDFParseResponse, error) {
-	// Use the shared helper to get or parse the PDF document
-	docID, parsedItem, err := operations.GetOrParsePDF(ctx, query.ZoteroID, query.URL, query.RawData, store)
+func DocumentParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query DocumentParseQuery, store storage.Store) (*mcp.CallToolResult, *DocumentParseResponse, error) {
+	// Use the shared helper to get or parse the document
+	docID, parsedItem, err := operations.GetOrParseDocument(ctx, query.ZoteroID, query.URL, query.RawData, query.DocType, store)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -49,7 +50,7 @@ func PDFParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query PD
 	resourcePaths := storage.CalculateResourcePaths(docID, parsedItem)
 
 	// Format the response with document metadata and statistics
-	responseData := &PDFParseResponse{
+	responseData := &DocumentParseResponse{
 		DocumentID:    docID,
 		ResourcePaths: resourcePaths,
 		Title:         parsedItem.Metadata.Title,
