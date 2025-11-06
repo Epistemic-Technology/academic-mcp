@@ -77,7 +77,7 @@ The `pdf-parse` tool supports three mutually exclusive input methods:
 The parsing process:
 1. Retrieves PDF data from one of the three sources
 2. Splits PDF into individual pages using `pdfcpu` library
-3. Processes pages **in parallel** with goroutines (see `internal/llm/openai.go:ParsePDF`)
+3. Processes pages **in parallel** with goroutines (see `internal/llm/openai.go:ParseDocument`)
 4. For each page, sends to OpenAI Responses API with GPT-5 Mini model
 5. Uses structured output (JSON schema) to extract per-page data, including:
    - Document metadata (title, authors, DOI, etc.)

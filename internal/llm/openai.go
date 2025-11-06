@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/openai/openai-go/v3"
@@ -13,6 +14,11 @@ import (
 
 	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
 	"github.com/Epistemic-Technology/academic-mcp/models"
+)
+
+var (
+	// ErrUnsupportedDocumentType is returned when attempting to parse a document type that is not yet supported
+	ErrUnsupportedDocumentType = errors.New("unsupported document type")
 )
 
 func ParsePDFPage(ctx context.Context, apiKey string, page *models.DocumentPageData) (*models.ParsedPage, error) {
@@ -219,7 +225,27 @@ IMPORTANT for page numbers: Be conservative. Only report page numbers with high 
 	return &parsedPage, nil
 }
 
-func ParsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (*models.ParsedItem, error) {
+// ParseDocument parses a document based on its type and returns a ParsedItem
+func ParseDocument(ctx context.Context, apiKey string, docData models.DocumentData) (*models.ParsedItem, error) {
+	switch docData.Type {
+	case "pdf":
+		return parsePDF(ctx, apiKey, docData)
+	case "html":
+		// TODO: Implement HTML parsing
+		return nil, ErrUnsupportedDocumentType
+	case "md", "txt":
+		// TODO: Implement text/markdown parsing
+		return nil, ErrUnsupportedDocumentType
+	case "docx":
+		// TODO: Implement DOCX parsing
+		return nil, ErrUnsupportedDocumentType
+	default:
+		return nil, ErrUnsupportedDocumentType
+	}
+}
+
+// parsePDF parses a PDF document and returns a ParsedItem
+func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (*models.ParsedItem, error) {
 	// Split the PDF into individual pages
 	pages, err := documents.SplitPdf(pdfData)
 	if err != nil {

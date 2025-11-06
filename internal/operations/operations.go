@@ -73,9 +73,9 @@ func GetOrParsePDF(ctx context.Context, zoteroID, url string, rawData []byte, st
 			return "", nil, errors.New("OPENAI_API_KEY environment variable not set")
 		}
 
-		parsedItem, err = llm.ParsePDF(ctx, apiKey, data)
+		parsedItem, err = llm.ParseDocument(ctx, apiKey, data)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to parse PDF: %w", err)
+			return "", nil, fmt.Errorf("failed to parse document: %w", err)
 		}
 
 		// Store the newly parsed document

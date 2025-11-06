@@ -186,7 +186,7 @@ func TestParsePDFPage_EmptyPage(t *testing.T) {
 	t.Logf("Got expected error: %v", err)
 }
 
-func TestParsePDF_Integration(t *testing.T) {
+func TestParseDocument_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -204,17 +204,17 @@ func TestParsePDF_Integration(t *testing.T) {
 			}
 
 			// Parse the entire PDF
-			parsedItem, err := ParsePDF(ctx, apiKey, models.DocumentData{
+			parsedItem, err := ParseDocument(ctx, apiKey, models.DocumentData{
 				Data: pdfBytes,
 				Type: "pdf",
 			})
 			if err != nil {
-				t.Fatalf("ParsePDF failed: %v", err)
+				t.Fatalf("ParseDocument failed: %v", err)
 			}
 
 			// Validate the structure
 			if parsedItem == nil {
-				t.Fatal("ParsePDF returned nil result")
+				t.Fatal("ParseDocument returned nil result")
 			}
 
 			// Pages should be present
@@ -272,7 +272,7 @@ func TestParsePDF_Integration(t *testing.T) {
 	}
 }
 
-func TestParsePDF_InvalidPDF(t *testing.T) {
+func TestParseDocument_InvalidPDF(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -284,14 +284,14 @@ func TestParsePDF_InvalidPDF(t *testing.T) {
 		Data: []byte("This is not a PDF"),
 		Type: "pdf",
 	}
-	_, err := ParsePDF(ctx, apiKey, invalidPDF)
+	_, err := ParseDocument(ctx, apiKey, invalidPDF)
 	if err == nil {
 		t.Error("Expected error with invalid PDF data, got nil")
 	}
 	t.Logf("Got expected error: %v", err)
 }
 
-func TestParsePDF_EmptyPDF(t *testing.T) {
+func TestParseDocument_EmptyPDF(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -303,7 +303,7 @@ func TestParsePDF_EmptyPDF(t *testing.T) {
 		Data: []byte{},
 		Type: "pdf",
 	}
-	_, err := ParsePDF(ctx, apiKey, emptyPDF)
+	_, err := ParseDocument(ctx, apiKey, emptyPDF)
 	if err == nil {
 		t.Error("Expected error with empty PDF data, got nil")
 	}
@@ -396,7 +396,7 @@ func TestParsedItem_JSONSerialization(t *testing.T) {
 	}
 }
 
-func TestParsePDF_ConcurrentPageProcessing(t *testing.T) {
+func TestParseDocument_ConcurrentPageProcessing(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -424,12 +424,12 @@ func TestParsePDF_ConcurrentPageProcessing(t *testing.T) {
 			expectedPageCount := len(pages)
 
 			// Parse the entire PDF (which processes pages concurrently)
-			parsedItem, err := ParsePDF(ctx, apiKey, models.DocumentData{
+			parsedItem, err := ParseDocument(ctx, apiKey, models.DocumentData{
 				Data: pdfBytes,
 				Type: "pdf",
 			})
 			if err != nil {
-				t.Fatalf("ParsePDF failed: %v", err)
+				t.Fatalf("ParseDocument failed: %v", err)
 			}
 
 			// Verify all pages were processed
