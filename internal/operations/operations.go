@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
 	"github.com/Epistemic-Technology/academic-mcp/internal/llm"
-	"github.com/Epistemic-Technology/academic-mcp/internal/pdf"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
@@ -40,7 +40,7 @@ func GetOrParsePDF(ctx context.Context, zoteroID, url string, rawData []byte, st
 	if rawData != nil {
 		data = rawData
 	} else {
-		data, err = pdf.GetData(ctx, *sourceInfo)
+		data, err = documents.GetData(ctx, *sourceInfo)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to fetch PDF data: %w", err)
 		}

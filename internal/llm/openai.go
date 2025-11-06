@@ -11,7 +11,7 @@ import (
 	"github.com/openai/openai-go/v3/responses"
 	"github.com/openai/openai-go/v3/shared"
 
-	"github.com/Epistemic-Technology/academic-mcp/internal/pdf"
+	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
@@ -221,7 +221,7 @@ IMPORTANT for page numbers: Be conservative. Only report page numbers with high 
 
 func ParsePDF(ctx context.Context, apiKey string, pdfData models.PdfData) (*models.ParsedItem, error) {
 	// Split the PDF into individual pages
-	pages, err := pdf.SplitPdf(pdfData)
+	pages, err := documents.SplitPdf(pdfData)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Epistemic-Technology/academic-mcp/internal/pdf"
+	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
@@ -51,7 +51,7 @@ func TestParsePDFPage_Integration(t *testing.T) {
 			}
 
 			// Split the PDF into pages
-			pages, err := pdf.SplitPdf(models.PdfData(pdfBytes))
+			pages, err := documents.SplitPdf(models.PdfData(pdfBytes))
 			if err != nil {
 				t.Fatalf("Failed to split PDF: %v", err)
 			}
@@ -145,7 +145,7 @@ func TestParsePDFPage_InvalidAPIKey(t *testing.T) {
 	}
 
 	// Split the PDF into pages
-	pages, err := pdf.SplitPdf(models.PdfData(pdfBytes))
+	pages, err := documents.SplitPdf(models.PdfData(pdfBytes))
 	if err != nil {
 		t.Fatalf("Failed to split PDF: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestParsePDF_ConcurrentPageProcessing(t *testing.T) {
 			}
 
 			// Get expected page count
-			pages, err := pdf.SplitPdf(models.PdfData(pdfBytes))
+			pages, err := documents.SplitPdf(models.PdfData(pdfBytes))
 			if err != nil {
 				t.Fatalf("Failed to split PDF: %v", err)
 			}
