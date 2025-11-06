@@ -12,8 +12,12 @@ This is an MCP (Model Context Protocol) server for academic research that provid
 # Build all binaries (outputs to bin/ directory)
 make build
 
-# Run tests
+# Run short tests (default - excludes OpenAI integration tests)
 make test
+go test -short ./...
+
+# Run all tests including OpenAI integration tests
+go test ./...
 
 # Clean build artifacts
 make clean
@@ -25,7 +29,9 @@ make cc-add-mcp
 make inspect
 ```
 
-**Important**: This project requires `GOEXPERIMENT=jsonv2` which is set automatically in the Makefile.
+**Important**: 
+- This project requires `GOEXPERIMENT=jsonv2` which is set automatically in the Makefile.
+- **Always run short tests by default** (`go test -short ./...`) to avoid making real OpenAI API calls during development. Only run full integration tests when specifically needed to verify OpenAI API integration.
 
 ## Architecture
 
