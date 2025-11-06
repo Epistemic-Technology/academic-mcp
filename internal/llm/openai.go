@@ -19,10 +19,11 @@ import (
 var (
 	// ErrUnsupportedDocumentType is returned when attempting to parse a document type that is not yet supported
 	ErrUnsupportedDocumentType = errors.New("unsupported document type")
-)
 
-func ParsePDFPage(ctx context.Context, apiKey string, page *models.DocumentPageData) (*models.ParsedPage, error) {
-	outputSchema := map[string]any{
+	// parsedDocumentSchema is the unified JSON schema for parsing all document types
+	// For non-PDF documents: page_number_info fields will be empty/zero values
+	// For text-only documents: images and tables arrays will be empty
+	parsedDocumentSchema = map[string]any{
 		"type": "object",
 		"properties": map[string]any{
 			"metadata": map[string]any{
@@ -144,6 +145,9 @@ func ParsePDFPage(ctx context.Context, apiKey string, page *models.DocumentPageD
 		"additionalProperties": false,
 		"required":             []string{"metadata", "content", "references", "images", "tables", "footnotes", "endnotes", "page_number_info"},
 	}
+)
+
+func ParsePDFPage(ctx context.Context, apiKey string, page *models.DocumentPageData) (*models.ParsedPage, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	encodedPageData := base64.StdEncoding.EncodeToString([]byte(*page))
 	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
@@ -209,7 +213,7 @@ IMPORTANT for page numbers: Be conservative. Only report page numbers with high 
 			},
 		},
 		Text: responses.ResponseTextConfigParam{
-			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("parsed_page", outputSchema),
+			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("parsed_page", parsedDocumentSchema),
 		},
 	},
 	)
@@ -231,11 +235,11 @@ func ParseDocument(ctx context.Context, apiKey string, docData models.DocumentDa
 	case "pdf":
 		return parsePDF(ctx, apiKey, docData)
 	case "html":
-		// TODO: Implement HTML parsing
-		return nil, ErrUnsupportedDocumentType
-	case "md", "txt":
-		// TODO: Implement text/markdown parsing
-		return nil, ErrUnsupportedDocumentType
+		return parseHTML(ctx, apiKey, docData)
+	case "md":
+		return parseMarkdown(ctx, apiKey, docData)
+	case "txt":
+		return parseText(ctx, apiKey, docData)
 	case "docx":
 		// TODO: Implement DOCX parsing
 		return nil, ErrUnsupportedDocumentType
@@ -328,6 +332,221 @@ func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (
 	}
 
 	return &parsedItem, nil
+}
+
+// parseHTML parses an HTML document and returns a ParsedItem
+func parseHTML(ctx context.Context, apiKey string, htmlData models.DocumentData) (*models.ParsedItem, error) {
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+		Model: shared.ChatModelGPT5Mini,
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage(
+					responses.ResponseInputMessageContentListParam{
+						responses.ResponseInputContentParamOfInputText(`Parse this HTML document from an academic paper and extract it into the specified JSON structure.
+
+1. Extract document metadata (title, authors, publication date, publication, doi, abstract) if present in the HTML.
+
+2. Extract the main textual content of the document.
+   - Convert to markdown syntax to format the text.
+   - Exclude navigation, headers, footers, sidebars, and other non-content elements.
+   - Include section headings using appropriate markdown heading levels.
+   - Preserve footnote/endnote references using square brackets eg. [1].
+
+3. If there are bibliographic references (not in-text citations, but full bibliographic entries), extract those into the "references" array.
+
+4. If there are images, extract captions and alt text into the "images" array. Use the img src attribute for image_url.
+
+5. If there are tables (HTML <table> elements), extract their content into the "tables" array.
+
+6. If there are footnotes (typically marked with <sup> or similar), extract them into the "footnotes" array. Use empty strings for page_number and in_text_page fields since HTML doesn't have page numbers.
+
+7. If there are endnotes (notes at the end of the document), extract them into the "endnotes" array. Use empty string for page_number field.
+
+8. For page_number_info, use empty string for page_number, 0.0 for confidence, "none" for location, and empty string for page_range_info since HTML documents don't have page numbers.
+
+HTML Content:
+` + string(htmlData.Data)),
+					},
+					"user",
+				),
+			},
+		},
+		Text: responses.ResponseTextConfigParam{
+			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("parsed_html", parsedDocumentSchema),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Metadata   models.ItemMetadata `json:"metadata"`
+		Content    string              `json:"content"`
+		References []models.Reference  `json:"references"`
+		Images     []models.Image      `json:"images"`
+		Tables     []models.Table      `json:"tables"`
+		Footnotes  []models.Footnote   `json:"footnotes"`
+		Endnotes   []models.Endnote    `json:"endnotes"`
+	}
+
+	outputText := response.OutputText()
+	err = json.Unmarshal([]byte(outputText), &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.ParsedItem{
+		Metadata:    result.Metadata,
+		Pages:       []string{result.Content},
+		PageNumbers: []string{"1"},
+		References:  result.References,
+		Images:      result.Images,
+		Tables:      result.Tables,
+		Footnotes:   result.Footnotes,
+		Endnotes:    result.Endnotes,
+	}, nil
+}
+
+// parseMarkdown parses a Markdown document and returns a ParsedItem
+func parseMarkdown(ctx context.Context, apiKey string, mdData models.DocumentData) (*models.ParsedItem, error) {
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+		Model: shared.ChatModelGPT5Mini,
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage(
+					responses.ResponseInputMessageContentListParam{
+						responses.ResponseInputContentParamOfInputText(`Parse this Markdown document from an academic paper and extract it into the specified JSON structure.
+
+1. Extract document metadata (title, authors, publication date, publication, doi, abstract) if present. Look for YAML frontmatter or metadata at the beginning.
+
+2. Extract the main textual content, preserving the markdown formatting.
+   - Keep all markdown syntax (headings, lists, emphasis, etc.).
+   - Preserve footnote/endnote references.
+
+3. If there are bibliographic references (full bibliographic entries), extract those into the "references" array.
+
+4. If there are images (markdown image syntax), extract them into the "images" array. Use the image URL and alt text.
+
+5. If there are markdown tables, extract their content into the "tables" array.
+
+6. If there are footnotes (typically marked with [^1] syntax), extract them into the "footnotes" array. Use empty strings for page_number and in_text_page fields since Markdown doesn't have page numbers.
+
+7. If there are endnotes at the end of the document, extract them into the "endnotes" array. Use empty string for page_number field.
+
+8. For page_number_info, use empty string for page_number, 0.0 for confidence, "none" for location, and empty string for page_range_info since Markdown documents don't have page numbers.
+
+Markdown Content:
+` + string(mdData.Data)),
+					},
+					"user",
+				),
+			},
+		},
+		Text: responses.ResponseTextConfigParam{
+			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("parsed_markdown", parsedDocumentSchema),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Metadata   models.ItemMetadata `json:"metadata"`
+		Content    string              `json:"content"`
+		References []models.Reference  `json:"references"`
+		Images     []models.Image      `json:"images"`
+		Tables     []models.Table      `json:"tables"`
+		Footnotes  []models.Footnote   `json:"footnotes"`
+		Endnotes   []models.Endnote    `json:"endnotes"`
+	}
+
+	outputText := response.OutputText()
+	err = json.Unmarshal([]byte(outputText), &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.ParsedItem{
+		Metadata:    result.Metadata,
+		Pages:       []string{result.Content},
+		PageNumbers: []string{"1"},
+		References:  result.References,
+		Images:      result.Images,
+		Tables:      result.Tables,
+		Footnotes:   result.Footnotes,
+		Endnotes:    result.Endnotes,
+	}, nil
+}
+
+// parseText parses a plain text document and returns a ParsedItem
+func parseText(ctx context.Context, apiKey string, textData models.DocumentData) (*models.ParsedItem, error) {
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+		Model: shared.ChatModelGPT5Mini,
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage(
+					responses.ResponseInputMessageContentListParam{
+						responses.ResponseInputContentParamOfInputText(`Parse this plain text document from an academic paper and extract it into the specified JSON structure.
+
+1. Extract document metadata (title, authors, publication date, publication, doi, abstract) if present at the beginning of the text.
+
+2. Extract the main textual content, converting it to markdown format:
+   - Identify section headings and mark them with appropriate markdown heading levels.
+   - Preserve paragraph structure.
+   - Preserve footnote/endnote references using square brackets eg. [1].
+
+3. If there are bibliographic references (full bibliographic entries, typically at the end), extract those into the "references" array.
+
+4. If there are footnotes (notes with markers), extract them into the "footnotes" array. Use empty strings for page_number and in_text_page fields since plain text doesn't have reliable page numbers.
+
+5. If there are endnotes at the end of the document, extract them into the "endnotes" array. Use empty string for page_number field.
+
+6. For page_number_info, use empty string for page_number, 0.0 for confidence, "none" for location, and empty string for page_range_info since plain text documents don't have page numbers.
+
+Note: Plain text documents won't have images or tables, so those arrays will be empty.
+
+Text Content:
+` + string(textData.Data)),
+					},
+					"user",
+				),
+			},
+		},
+		Text: responses.ResponseTextConfigParam{
+			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("parsed_text", parsedDocumentSchema),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Metadata   models.ItemMetadata `json:"metadata"`
+		Content    string              `json:"content"`
+		References []models.Reference  `json:"references"`
+		Footnotes  []models.Footnote   `json:"footnotes"`
+		Endnotes   []models.Endnote    `json:"endnotes"`
+	}
+
+	outputText := response.OutputText()
+	err = json.Unmarshal([]byte(outputText), &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.ParsedItem{
+		Metadata:    result.Metadata,
+		Pages:       []string{result.Content},
+		PageNumbers: []string{"1"},
+		References:  result.References,
+		Images:      []models.Image{},
+		Tables:      []models.Table{},
+		Footnotes:   result.Footnotes,
+		Endnotes:    result.Endnotes,
+	}, nil
 }
 
 func SummarizeItem(ctx context.Context, apiKey string, pdfData *models.ParsedItem) (string, error) {
