@@ -15,7 +15,7 @@ import (
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
-func ParsePDFPage(ctx context.Context, apiKey string, page *models.PdfPageData) (*models.ParsedPage, error) {
+func ParsePDFPage(ctx context.Context, apiKey string, page *models.DocumentPageData) (*models.ParsedPage, error) {
 	outputSchema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -219,7 +219,7 @@ IMPORTANT for page numbers: Be conservative. Only report page numbers with high 
 	return &parsedPage, nil
 }
 
-func ParsePDF(ctx context.Context, apiKey string, pdfData models.PdfData) (*models.ParsedItem, error) {
+func ParsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (*models.ParsedItem, error) {
 	// Split the PDF into individual pages
 	pages, err := documents.SplitPdf(pdfData)
 	if err != nil {
@@ -236,7 +236,7 @@ func ParsePDF(ctx context.Context, apiKey string, pdfData models.PdfData) (*mode
 
 	// Process each page in parallel
 	for i, page := range pages {
-		go func(pageNum int, pageData *models.PdfPageData) {
+		go func(pageNum int, pageData *models.DocumentPageData) {
 			parsed, err := ParsePDFPage(ctx, apiKey, pageData)
 			results <- pageResult{
 				pageNum: pageNum,

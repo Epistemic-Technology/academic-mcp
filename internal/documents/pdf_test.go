@@ -40,7 +40,10 @@ func TestSplitPdf(t *testing.T) {
 			t.Logf("PDF %s has %d pages", filepath.Base(filePath), expectedPageCount)
 
 			// Split the PDF
-			pages, err := SplitPdf(models.PdfData(pdfBytes))
+			pages, err := SplitPdf(models.DocumentData{
+				Data: pdfBytes,
+				Type: "pdf",
+			})
 			if err != nil {
 				t.Fatalf("SplitPdf failed: %v", err)
 			}
@@ -82,7 +85,10 @@ func TestSplitPdf(t *testing.T) {
 }
 
 func TestSplitPdf_EmptyInput(t *testing.T) {
-	_, err := SplitPdf(models.PdfData([]byte{}))
+	_, err := SplitPdf(models.DocumentData{
+		Data: []byte{},
+		Type: "pdf",
+	})
 	if err == nil {
 		t.Error("Expected error for empty PDF data, got nil")
 	}
@@ -90,7 +96,10 @@ func TestSplitPdf_EmptyInput(t *testing.T) {
 
 func TestSplitPdf_InvalidInput(t *testing.T) {
 	invalidData := []byte("This is not a PDF")
-	_, err := SplitPdf(models.PdfData(invalidData))
+	_, err := SplitPdf(models.DocumentData{
+		Data: invalidData,
+		Type: "pdf",
+	})
 	if err == nil {
 		t.Error("Expected error for invalid PDF data, got nil")
 	}

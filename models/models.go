@@ -75,9 +75,14 @@ type Endnote struct {
 	PageNumber string `json:"page_number,omitempty"` // The page where this endnote definition appears
 }
 
-type PdfData []byte
-type PdfPageData []byte
-type PdfPages []PdfPageData
+// DocumentData represents a document in various formats
+type DocumentData struct {
+	Data []byte
+	Type string // pdf, html, md, docx, etc.
+}
+
+type DocumentPageData []byte
+type DocumentPages []DocumentPageData
 
 // SourceInfo contains information about where the PDF came from
 type SourceInfo struct {

@@ -51,7 +51,10 @@ func TestParsePDFPage_Integration(t *testing.T) {
 			}
 
 			// Split the PDF into pages
-			pages, err := documents.SplitPdf(models.PdfData(pdfBytes))
+			pages, err := documents.SplitPdf(models.DocumentData{
+				Data: pdfBytes,
+				Type: "pdf",
+			})
 			if err != nil {
 				t.Fatalf("Failed to split PDF: %v", err)
 			}
@@ -145,7 +148,10 @@ func TestParsePDFPage_InvalidAPIKey(t *testing.T) {
 	}
 
 	// Split the PDF into pages
-	pages, err := documents.SplitPdf(models.PdfData(pdfBytes))
+	pages, err := documents.SplitPdf(models.DocumentData{
+		Data: pdfBytes,
+		Type: "pdf",
+	})
 	if err != nil {
 		t.Fatalf("Failed to split PDF: %v", err)
 	}
@@ -172,7 +178,7 @@ func TestParsePDFPage_EmptyPage(t *testing.T) {
 	apiKey := getAPIKey(t)
 	ctx := context.Background()
 
-	emptyPage := models.PdfPageData([]byte{})
+	emptyPage := models.DocumentPageData([]byte{})
 	_, err := ParsePDFPage(ctx, apiKey, &emptyPage)
 	if err == nil {
 		t.Error("Expected error with empty page data, got nil")
@@ -198,7 +204,10 @@ func TestParsePDF_Integration(t *testing.T) {
 			}
 
 			// Parse the entire PDF
-			parsedItem, err := ParsePDF(ctx, apiKey, models.PdfData(pdfBytes))
+			parsedItem, err := ParsePDF(ctx, apiKey, models.DocumentData{
+				Data: pdfBytes,
+				Type: "pdf",
+			})
 			if err != nil {
 				t.Fatalf("ParsePDF failed: %v", err)
 			}
@@ -271,7 +280,10 @@ func TestParsePDF_InvalidPDF(t *testing.T) {
 	apiKey := getAPIKey(t)
 	ctx := context.Background()
 
-	invalidPDF := models.PdfData([]byte("This is not a PDF"))
+	invalidPDF := models.DocumentData{
+		Data: []byte("This is not a PDF"),
+		Type: "pdf",
+	}
 	_, err := ParsePDF(ctx, apiKey, invalidPDF)
 	if err == nil {
 		t.Error("Expected error with invalid PDF data, got nil")
@@ -287,7 +299,10 @@ func TestParsePDF_EmptyPDF(t *testing.T) {
 	apiKey := getAPIKey(t)
 	ctx := context.Background()
 
-	emptyPDF := models.PdfData([]byte{})
+	emptyPDF := models.DocumentData{
+		Data: []byte{},
+		Type: "pdf",
+	}
 	_, err := ParsePDF(ctx, apiKey, emptyPDF)
 	if err == nil {
 		t.Error("Expected error with empty PDF data, got nil")
@@ -399,14 +414,20 @@ func TestParsePDF_ConcurrentPageProcessing(t *testing.T) {
 			}
 
 			// Get expected page count
-			pages, err := documents.SplitPdf(models.PdfData(pdfBytes))
+			pages, err := documents.SplitPdf(models.DocumentData{
+				Data: pdfBytes,
+				Type: "pdf",
+			})
 			if err != nil {
 				t.Fatalf("Failed to split PDF: %v", err)
 			}
 			expectedPageCount := len(pages)
 
 			// Parse the entire PDF (which processes pages concurrently)
-			parsedItem, err := ParsePDF(ctx, apiKey, models.PdfData(pdfBytes))
+			parsedItem, err := ParsePDF(ctx, apiKey, models.DocumentData{
+				Data: pdfBytes,
+				Type: "pdf",
+			})
 			if err != nil {
 				t.Fatalf("ParsePDF failed: %v", err)
 			}

@@ -8,10 +8,10 @@ import (
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
-// GenerateDocumentID creates a unique document ID from source info and PDF data.
+// GenerateDocumentID creates a unique document ID from source info and document data.
 // This function can be called before parsing to check if a document already exists.
-// Priority: Zotero ID > URL hash > PDF data hash
-func GenerateDocumentID(sourceInfo *models.SourceInfo, pdfData models.PdfData) string {
+// Priority: Zotero ID > URL hash > document data hash
+func GenerateDocumentID(sourceInfo *models.SourceInfo, documentData models.DocumentData) string {
 	if sourceInfo.ZoteroID != "" {
 		return "zotero_" + sourceInfo.ZoteroID
 	}
@@ -20,8 +20,8 @@ func GenerateDocumentID(sourceInfo *models.SourceInfo, pdfData models.PdfData) s
 		hash := sha256.Sum256([]byte(sourceInfo.URL))
 		return fmt.Sprintf("url_%x", hash[:8]) // Use first 8 bytes for shorter IDs
 	}
-	// Fallback to hash of PDF data
-	hash := sha256.Sum256(pdfData)
+	// Fallback to hash of document data
+	hash := sha256.Sum256(documentData.Data)
 	return fmt.Sprintf("data_%x", hash[:8])
 }
 

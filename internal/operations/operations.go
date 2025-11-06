@@ -35,10 +35,13 @@ func GetOrParsePDF(ctx context.Context, zoteroID, url string, rawData []byte, st
 	}
 
 	// Get PDF data from appropriate source
-	var data models.PdfData
+	var data models.DocumentData
 	var err error
 	if rawData != nil {
-		data = rawData
+		data = models.DocumentData{
+			Data: rawData,
+			Type: "pdf",
+		}
 	} else {
 		data, err = documents.GetData(ctx, *sourceInfo)
 		if err != nil {
