@@ -226,6 +226,7 @@ Searches for items in a Zotero library and retrieves their metadata and attachme
 - `query`: Quick search text (searches title, creator, year)
 - `tags`: Filter by tags (array of strings)
 - `item_types`: Filter by item type (e.g., "book", "article"); prefix with "-" to exclude (e.g., "-attachment")
+- `collection`: Filter by collection key (optional) - restricts search to items within a specific collection
 - `limit`: Maximum number of results (default: 25)
 - `sort`: Sort field (default: "dateModified")
 
@@ -243,13 +244,45 @@ Searches for items in a Zotero library and retrieves their metadata and attachme
 
 **Typical Workflow**:
 ```
-1. Use zotero-search to find items:
-   query="climate change adaptation", limit=10
+1. Use zotero-collections to find a collection key:
+   top_level_only=true
    
-2. Review results to find the item you want
+2. Use zotero-search to find items within that collection:
+   collection="ABC123XYZ", query="climate change adaptation", limit=10
+   
+3. Review results to find the item you want
 
-3. Use the attachment key from the results in document-parse:
-   zotero_id="ABC123XYZ" (from attachments[0].key)
+4. Use the attachment key from the results in document-parse:
+   zotero_id="DEF456UVW" (from attachments[0].key)
+```
+
+**Note**: This tool requires `ZOTERO_API_KEY` and `ZOTERO_LIBRARY_ID` environment variables to be set.
+
+### zotero-collections
+Lists and searches collections in a Zotero library. This tool helps you browse your library's organizational structure and find collection keys for filtering or organizing items.
+
+**Input Parameters**:
+- `top_level_only`: Boolean - list only top-level collections (no parent) (default: false)
+- `parent_collection`: String - filter by parent collection key to get subcollections
+- `limit`: Maximum number of results (default: 100)
+- `sort`: Sort field (default: "title")
+
+**Returns**: Array of collections with:
+- `key`: Collection key (unique identifier)
+- `name`: Collection name
+- `parent_collection`: Parent collection key (empty if top-level)
+- `count`: Total number of collections returned
+
+**Typical Workflow**:
+```
+1. List all collections to browse library structure:
+   (no parameters - returns all collections)
+   
+2. List only top-level collections:
+   top_level_only=true
+   
+3. Get subcollections of a specific collection:
+   parent_collection="ABC123XYZ"
 ```
 
 **Note**: This tool requires `ZOTERO_API_KEY` and `ZOTERO_LIBRARY_ID` environment variables to be set.

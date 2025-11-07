@@ -14,11 +14,12 @@ import (
 )
 
 type ZoteroSearchQuery struct {
-	Query     string   `json:"query,omitempty"`      // Quick search text (searches title, creator, year)
-	Tags      []string `json:"tags,omitempty"`       // Filter by tags
-	ItemTypes []string `json:"item_types,omitempty"` // Filter by type (e.g., "book", "article", "-attachment")
-	Limit     int      `json:"limit,omitempty"`      // Max results (default 25)
-	Sort      string   `json:"sort,omitempty"`       // Sort field (default "dateModified")
+	Query      string   `json:"query,omitempty"`      // Quick search text (searches title, creator, year)
+	Tags       []string `json:"tags,omitempty"`       // Filter by tags
+	ItemTypes  []string `json:"item_types,omitempty"` // Filter by type (e.g., "book", "article", "-attachment")
+	Collection string   `json:"collection,omitempty"` // Filter by collection key (optional)
+	Limit      int      `json:"limit,omitempty"`      // Max results (default 25)
+	Sort       string   `json:"sort,omitempty"`       // Sort field (default "dateModified")
 }
 
 type ZoteroSearchResponse struct {
@@ -70,11 +71,12 @@ func ZoteroSearchToolHandler(ctx context.Context, req *mcp.CallToolRequest, quer
 
 	// Convert tool query parameters to operations parameters
 	searchParams := operations.ZoteroSearchParams{
-		Query:     query.Query,
-		Tags:      query.Tags,
-		ItemTypes: query.ItemTypes,
-		Limit:     query.Limit,
-		Sort:      query.Sort,
+		Query:      query.Query,
+		Tags:       query.Tags,
+		ItemTypes:  query.ItemTypes,
+		Collection: query.Collection,
+		Limit:      query.Limit,
+		Sort:       query.Sort,
 	}
 
 	// Execute search using internal operation

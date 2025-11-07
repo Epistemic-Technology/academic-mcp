@@ -10,11 +10,12 @@ import (
 
 // ZoteroSearchParams contains parameters for searching a Zotero library.
 type ZoteroSearchParams struct {
-	Query     string   // Quick search text (searches title, creator, year)
-	Tags      []string // Filter by tags
-	ItemTypes []string // Filter by type (e.g., "book", "article", "-attachment")
-	Limit     int      // Max results (default 25)
-	Sort      string   // Sort field (default "dateModified")
+	Query      string   // Quick search text (searches title, creator, year)
+	Tags       []string // Filter by tags
+	ItemTypes  []string // Filter by type (e.g., "book", "article", "-attachment")
+	Collection string   // Filter by collection key (optional)
+	Limit      int      // Max results (default 25)
+	Sort       string   // Sort field (default "dateModified")
 }
 
 // ZoteroItemResult represents a Zotero item with its attachments.
@@ -78,11 +79,23 @@ func SearchZotero(ctx context.Context, apiKey, libraryID string, params ZoteroSe
 		queryParams.Sort = "dateModified"
 	}
 
-	// Search for items
-	items, err := client.Items(ctx, queryParams)
-	if err != nil {
-		log.Error("Failed to search Zotero library: %v", err)
-		return nil, fmt.Errorf("failed to search Zotero library: %w", err)
+	// Search for items (either in a specific collection or the entire library)
+	var items []zotero.Item
+	var err error
+	if params.Collection != "" {
+		// Search within a specific collection
+		items, err = client.CollectionItems(ctx, params.Collection, queryParams)
+		if err != nil {
+			log.Error("Failed to search collection %s: %v", params.Collection, err)
+			return nil, fmt.Errorf("failed to search collection %s: %w", params.Collection, err)
+		}
+	} else {
+		// Search the entire library
+		items, err = client.Items(ctx, queryParams)
+		if err != nil {
+			log.Error("Failed to search Zotero library: %v", err)
+			return nil, fmt.Errorf("failed to search Zotero library: %w", err)
+		}
 	}
 
 	log.Info("Found %d items in Zotero library", len(items))
