@@ -14,6 +14,9 @@ import (
 
 	"github.com/Epistemic-Technology/academic-mcp/models"
 	"github.com/Epistemic-Technology/zotero/zotero"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/base"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/commonmark"
 )
 
 // DetectDocumentType determines the type of document from the raw data
@@ -253,4 +256,28 @@ func isZoteroSnapshotZip(data []byte) bool {
 	}
 
 	return false
+}
+
+// PreprocessHTML converts HTML to markdown to reduce context window usage.
+// This strips unnecessary markup, scripts, styling, and images while preserving
+// document structure (headings, lists, tables, links).
+func PreprocessHTML(htmlData []byte) (string, error) {
+	// Create converter with base and commonmark plugins
+	conv := converter.NewConverter(
+		converter.WithPlugins(
+			base.NewBasePlugin(),
+			commonmark.NewCommonmarkPlugin(),
+		),
+	)
+
+	// Remove images to avoid embedding large base64 SVG/image data
+	conv.Register.TagType("img", converter.TagTypeRemove, converter.PriorityStandard)
+
+	// Convert HTML bytes to markdown string
+	markdown, err := conv.ConvertReader(bytes.NewReader(htmlData))
+	if err != nil {
+		return "", fmt.Errorf("failed to convert HTML to markdown: %w", err)
+	}
+
+	return string(markdown), nil
 }

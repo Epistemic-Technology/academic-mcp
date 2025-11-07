@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an MCP (Model Context Protocol) server for academic research that provides tools for parsing and analyzing academic PDFs. The server is written in Go and uses OpenAI's vision capabilities to extract structured data from academic papers.
+This is an MCP (Model Context Protocol) server for academic research that provides tools for parsing and analyzing academic documents in multiple formats (PDF, HTML, Markdown, plain text, and DOCX). The server is written in Go and uses OpenAI's vision capabilities to extract structured data from academic papers.
 
 ## Build and Development Commands
 
@@ -49,8 +49,8 @@ The codebase follows a clean layered architecture:
    - Handles storage initialization at `~/.academic-mcp/academic.db` (configurable via `ACADEMIC_MCP_DB_PATH`)
 
 3. **Tools Layer** (`tools/`): Contains MCP tool implementations. Each tool must provide:
-   - A tool definition function (e.g., `PDFParseTool()`) that returns `*mcp.Tool` with JSON schema
-   - A handler function (e.g., `PDFParseToolHandler()`) that processes requests
+   - A tool definition function (e.g., `DocumentParseTool()`) that returns `*mcp.Tool` with JSON schema
+   - A handler function (e.g., `DocumentParseToolHandler()`) that processes requests
    - Query and Response types for structured input/output
 
 4. **Storage Layer** (`internal/storage/`):
@@ -68,22 +68,48 @@ The codebase follows a clean layered architecture:
 
 6. **Internal Packages**:
    - `internal/llm/`: OpenAI API integration using Responses API with structured outputs (parsing and summarization)
-   - `internal/pdf/`: PDF utilities (splitting, fetching from URL/Zotero)
+   - `internal/documents/`: Document utilities including:
+     - PDF splitting using pdfcpu library
+     - Document type detection from magic bytes/headers
+     - Fetching documents from URL/Zotero
+     - Zotero web archive (ZIP) extraction
+     - HTML-to-markdown conversion (`PreprocessHTML()`) to reduce context window usage
    - `internal/operations/`: Shared business logic used across multiple tools
+   - `internal/logger/`: Logging infrastructure for the server
 
 7. **Models Layer** (`models/models.go`): Shared data structures used across all layers.
 
-### PDF Parsing Flow
+### Document Parsing Flow
 
-The `pdf-parse` tool supports three mutually exclusive input methods:
-- **`zotero_id`**: Fetches PDF from Zotero library (requires `ZOTERO_API_KEY` and `ZOTERO_LIBRARY_ID` env vars)
-- **`url`**: Downloads PDF from a URL
-- **`raw_data`**: Accepts base64-encoded PDF data directly
+The `document-parse` tool supports multiple input methods and document types:
 
-The parsing process:
-1. Retrieves PDF data from one of the three sources
+**Input Methods** (mutually exclusive):
+- **`zotero_id`**: Fetches document from Zotero library (requires `ZOTERO_API_KEY` and `ZOTERO_LIBRARY_ID` env vars)
+  - Automatically detects document type
+  - Handles Zotero web archive ZIP files by extracting HTML content
+- **`url`**: Downloads document from a URL
+- **`raw_data`**: Accepts raw document bytes directly
+- **`doc_type`**: Optional parameter to override automatic type detection (e.g., "pdf", "html", "md", "txt")
+
+**Supported Document Types**:
+- **PDF**: Uses vision-based extraction with page splitting
+- **HTML**: Single-pass parsing with vision model
+- **Markdown**: Single-pass parsing optimized for text extraction
+- **Plain Text**: Single-pass parsing optimized for text extraction
+- **DOCX**: Planned (not yet implemented)
+
+**Document Type Detection**:
+The system automatically detects document types by examining magic bytes and headers:
+- PDF: `%PDF` signature
+- HTML: DOCTYPE or `<html>` tags
+- Markdown: Common markdown patterns (`#`, `` ``` ``)
+- ZIP-based formats: Checks for DOCX or Zotero web archives
+- Plain text: Valid UTF-8 with high proportion of printable characters
+
+**PDF Parsing Process** (most complex):
+1. Retrieves document data from one of the three sources
 2. Splits PDF into individual pages using `pdfcpu` library
-3. Processes pages **in parallel** with goroutines (see `internal/llm/openai.go:ParseDocument`)
+3. Processes pages **in parallel** with goroutines (see `internal/llm/openai.go:parsePDF`)
 4. For each page, sends to OpenAI Responses API with GPT-5 Mini model
 5. Uses structured output (JSON schema) to extract per-page data, including:
    - Document metadata (title, authors, DOI, etc.)
@@ -98,6 +124,15 @@ The parsing process:
 7. Aggregates results from all pages into a single `models.ParsedItem`
 8. Stores in SQLite database with both sequential and source page numbers
 9. Returns document ID and resource URIs for accessing content
+
+**HTML/Markdown/Text Parsing Process**:
+1. Retrieves document data from source
+2. **For HTML documents**: Converts HTML to markdown using `github.com/JohannesKaufmann/html-to-markdown/v2` to reduce context window usage (typically 5-10x reduction). This strips scripts, styles, images, and unnecessary markup while preserving document structure (headings, lists, tables, links).
+3. Sends document content (markdown-converted HTML, or original markdown/text) to OpenAI API in single request
+4. Extracts structured data (metadata, content, references, images, tables)
+5. Page numbering fields remain empty for non-PDF documents
+6. Stores in SQLite database
+7. Returns document ID and resource URIs
 
 ### Page Numbering System
 
@@ -150,35 +185,39 @@ After parsing, document content is accessible via standardized URIs:
 
 ## Available Tools
 
-### pdf-parse
-Parses a PDF document and extracts structured data including metadata, content, references, images, tables, footnotes, and endnotes. The parsed document is stored in SQLite and accessible via resource URIs.
+### document-parse
+Parses a document (PDF, HTML, Markdown, plain text, or DOCX) and extracts structured data including metadata, content, references, images, tables, footnotes, and endnotes. The parsed document is stored in SQLite and accessible via resource URIs.
 
 **Input Parameters** (mutually exclusive):
-- `zotero_id`: Fetch PDF from Zotero library
-- `url`: Download PDF from URL
-- `raw_data`: Base64-encoded PDF bytes
+- `zotero_id`: Fetch document from Zotero library (auto-detects type, handles web archives)
+- `url`: Download document from URL
+- `raw_data`: Raw document bytes
+- `doc_type`: Optional type override (e.g., "pdf", "html", "md", "txt")
 
-**Returns**: Document ID and resource URIs for accessing parsed content.
+**Returns**: Document ID, resource URIs, title, and content statistics (page count, reference count, etc.).
 
-### pdf-summarize
-Generates a concise 1-3 paragraph summary of a PDF document using GPT-5 Mini. If the document hasn't been parsed yet, it will automatically parse it first using `GetOrParsePDF()`. The summary uses a detached academic tone and expository prose.
+### document-summarize
+Generates a concise 1-3 paragraph summary of a document using GPT-5 Mini. If the document hasn't been parsed yet, it will automatically parse it first using `GetOrParseDocument()`. The summary uses a detached academic tone and expository prose. Supports all document types (PDF, HTML, Markdown, plain text).
 
 **Input Parameters** (mutually exclusive):
-- `zotero_id`: Fetch PDF from Zotero library
-- `url`: Download PDF from URL
-- `raw_data`: Base64-encoded PDF bytes
+- `zotero_id`: Fetch document from Zotero library
+- `url`: Download document from URL
+- `raw_data`: Raw document bytes
+- `doc_type`: Optional type override
 
 **Returns**: Document ID, resource URIs, document title, and generated summary.
 
 ### Shared Operations
 
-Both tools use the `internal/operations/GetOrParsePDF()` function, which:
-1. Generates a document ID from the source information
-2. Checks if the document already exists in storage
-3. If it exists, retrieves it; otherwise parses and stores it
-4. Returns the document ID and parsed item
+Both tools use the `internal/operations/GetOrParseDocument()` function, which:
+1. Retrieves document data from the specified source (Zotero, URL, or raw data)
+2. Auto-detects document type or uses provided `doc_type` parameter
+3. Generates a document ID from the source information and content hash
+4. Checks if the document already exists in storage
+5. If it exists, retrieves it; otherwise parses and stores it
+6. Returns the document ID and parsed item
 
-This pattern ensures documents are only parsed once and can be efficiently reused across multiple tools.
+This pattern ensures documents are only parsed once and can be efficiently reused across multiple tools. The legacy `GetOrParsePDF()` function still exists as a convenience wrapper that forces the type to "pdf".
 
 ### Adding New Tools
 
@@ -209,16 +248,16 @@ To add a new MCP tool:
    })
    ```
 
-### Using GetOrParsePDF for Tool Development
+### Using GetOrParseDocument for Tool Development
 
-When creating tools that need parsed PDF documents, use `internal/operations/GetOrParsePDF()` to avoid duplicate parsing:
+When creating tools that need parsed documents, use `internal/operations/GetOrParseDocument()` to avoid duplicate parsing:
 
 ```go
 import "github.com/Epistemic-Technology/academic-mcp/internal/operations"
 
-func MyToolHandler(ctx context.Context, req *mcp.CallToolRequest, query MyQuery, store storage.Store) (*mcp.CallToolResult, *MyResponse, error) {
-    // GetOrParsePDF handles fetching, parsing, and storage automatically
-    docID, parsedItem, err := operations.GetOrParsePDF(ctx, query.ZoteroID, query.URL, query.RawData, store)
+func MyToolHandler(ctx context.Context, req *mcp.CallToolRequest, query MyQuery, store storage.Store, log logger.Logger) (*mcp.CallToolResult, *MyResponse, error) {
+    // GetOrParseDocument handles fetching, parsing, and storage automatically
+    docID, parsedItem, err := operations.GetOrParseDocument(ctx, query.ZoteroID, query.URL, query.RawData, query.DocType, store, log)
     if err != nil {
         return nil, nil, err
     }
@@ -230,10 +269,12 @@ func MyToolHandler(ctx context.Context, req *mcp.CallToolRequest, query MyQuery,
 
 This pattern:
 - Automatically generates consistent document IDs
+- Auto-detects document type from content (or uses provided `doc_type`)
 - Checks if the document exists before parsing
 - Parses and stores new documents
 - Returns existing documents from storage
-- Handles all three input methods (Zotero, URL, raw data)
+- Handles all input methods (Zotero, URL, raw data)
+- Supports multiple document formats (PDF, HTML, Markdown, plain text)
 
 ### Adding New Storage Methods
 
@@ -247,8 +288,8 @@ If you need to add new storage capabilities:
 
 ## Environment Variables
 
-Required for PDF parsing:
-- `OPENAI_API_KEY`: OpenAI API key (required for all PDF operations)
+Required for document parsing:
+- `OPENAI_API_KEY`: OpenAI API key (required for all document parsing operations)
 - `ZOTERO_API_KEY`: Zotero API key (only required when using `zotero_id` parameter)
 - `ZOTERO_LIBRARY_ID`: Zotero library ID (only required when using `zotero_id` parameter)
 - `ACADEMIC_MCP_DB_PATH`: Optional path to SQLite database (defaults to `~/.academic-mcp/academic.db`)
@@ -261,6 +302,7 @@ Required for PDF parsing:
 - `github.com/google/jsonschema-go` - JSON schema generation for tool inputs
 - `github.com/pdfcpu/pdfcpu` - PDF processing and page extraction
 - `github.com/mattn/go-sqlite3` - SQLite driver for persistent storage
+- `github.com/JohannesKaufmann/html-to-markdown/v2` - HTML-to-markdown conversion for reducing context window usage
 
 ## Testing with MCP Inspector
 
