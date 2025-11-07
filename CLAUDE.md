@@ -207,6 +207,53 @@ Generates a concise 1-3 paragraph summary of a document using GPT-5 Mini. If the
 
 **Returns**: Document ID, resource URIs, document title, and generated summary.
 
+### document-quotations
+Extracts representative quotations from a document (PDF, HTML, Markdown, plain text, or DOCX). The document is parsed and summarized first, then an LLM identifies significant quotations with page numbers (for paginated documents). Supports all document types. Use `max_quotations` to limit results (default: 10, 0 = unlimited).
+
+**Input Parameters** (mutually exclusive):
+- `zotero_id`: Fetch document from Zotero library
+- `url`: Download document from URL
+- `raw_data`: Raw document bytes
+- `doc_type`: Optional type override
+- `max_quotations`: Maximum number of quotations to extract (default: 10)
+
+**Returns**: Document ID, resource URIs, document title, and list of significant quotations with page numbers and relevance explanations.
+
+### zotero-search
+Searches for items in a Zotero library and retrieves their metadata and attachment information. This tool provides a user-friendly way to discover documents in your Zotero library before parsing them. Returns bibliographic items (books, articles, etc.) along with their associated file attachments (PDFs, etc.).
+
+**Input Parameters**:
+- `query`: Quick search text (searches title, creator, year)
+- `tags`: Filter by tags (array of strings)
+- `item_types`: Filter by item type (e.g., "book", "article"); prefix with "-" to exclude (e.g., "-attachment")
+- `limit`: Maximum number of results (default: 25)
+- `sort`: Sort field (default: "dateModified")
+
+**Returns**: Array of items with:
+- `key`: Item key for the bibliographic entry
+- `title`: Item title
+- `creators`: Array of creator names (authors, editors, etc.)
+- `item_type`: Type of item (book, article, etc.)
+- `date`: Date added to library
+- `attachments`: Array of attachment information:
+  - `key`: Attachment key (use this as `zotero_id` in `document-parse`)
+  - `filename`: Name of the attached file
+  - `content_type`: MIME type (e.g., "application/pdf")
+  - `link_mode`: How the file is attached (imported_file, imported_url, etc.)
+
+**Typical Workflow**:
+```
+1. Use zotero-search to find items:
+   query="climate change adaptation", limit=10
+   
+2. Review results to find the item you want
+
+3. Use the attachment key from the results in document-parse:
+   zotero_id="ABC123XYZ" (from attachments[0].key)
+```
+
+**Note**: This tool requires `ZOTERO_API_KEY` and `ZOTERO_LIBRARY_ID` environment variables to be set.
+
 ### Shared Operations
 
 Both tools use the `internal/operations/GetOrParseDocument()` function, which:

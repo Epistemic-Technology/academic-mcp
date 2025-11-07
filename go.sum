@@ -1,5 +1,7 @@
 github.com/Epistemic-Technology/zotero v0.1.0 h1:Mk3gIfKl7SJXSSuzEMN4RLnZEYsZgig58w9D+PFntck=
 github.com/Epistemic-Technology/zotero v0.1.0/go.mod h1:iBc2KyTGeI80ebyxGaf2/C3HwTnLnNILOwTCqEdZHDs=
+github.com/Epistemic-Technology/zotero v0.1.1 h1:1IrkzCz0kzw18qlxyurG1tUmPrUrjbc5Wemzy1iQaN0=
+github.com/Epistemic-Technology/zotero v0.1.1/go.mod h1:iBc2KyTGeI80ebyxGaf2/C3HwTnLnNILOwTCqEdZHDs=
 github.com/JohannesKaufmann/dom v0.2.0 h1:1bragmEb19K8lHAqgFgqCpiPCFEZMTXzOIEjuxkUfLQ=
 github.com/JohannesKaufmann/dom v0.2.0/go.mod h1:57iSUl5RKric4bUkgos4zu6Xt5LMHUnw3TF1l5CbGZo=
 github.com/JohannesKaufmann/html-to-markdown/v2 v2.4.0 h1:C0/TerKdQX9Y9pbYi1EsLr5LDNANsqunyI/btpyfCg8=

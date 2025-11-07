@@ -3,7 +3,7 @@ module github.com/Epistemic-Technology/academic-mcp
 go 1.25.3
 
 require (
-	github.com/Epistemic-Technology/zotero v0.1.0
+	github.com/Epistemic-Technology/zotero v0.1.1
 	github.com/google/jsonschema-go v0.3.0
 	github.com/modelcontextprotocol/go-sdk v1.0.0
 	github.com/openai/openai-go/v3 v3.6.1

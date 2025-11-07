@@ -36,6 +36,10 @@ func CreateServer(log logger.Logger) *mcp.Server {
 		return tools.DocumentQuotationsToolHandler(ctx, req, query, store, log)
 	})
 
+	mcp.AddTool(server, tools.ZoteroSearchTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.ZoteroSearchQuery) (*mcp.CallToolResult, *tools.ZoteroSearchResponse, error) {
+		return tools.ZoteroSearchToolHandler(ctx, req, query, store, log)
+	})
+
 	// Template for document summary
 	server.AddResourceTemplate(&mcp.ResourceTemplate{
 		URITemplate: "pdf://{documentId}",
