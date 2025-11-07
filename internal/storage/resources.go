@@ -68,5 +68,13 @@ func CalculateResourcePaths(docID string, parsedItem *models.ParsedItem) []strin
 		)
 	}
 
+	// Add quotation paths if quotations exist
+	if len(parsedItem.Quotations) > 0 {
+		resourcePaths = append(resourcePaths,
+			fmt.Sprintf("pdf://%s/quotations", docID),
+			fmt.Sprintf("pdf://%s/quotations/{quotationIndex}", docID),
+		)
+	}
+
 	return resourcePaths
 }

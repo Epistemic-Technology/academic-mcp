@@ -9,6 +9,7 @@ import (
 	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/internal/operations"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
+	"github.com/Epistemic-Technology/academic-mcp/models"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -51,6 +52,18 @@ func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 	// Calculate resource paths for accessing the document content
 	resourcePaths := storage.CalculateResourcePaths(docID, parsedItem)
 
+	// Check if summary already exists
+	if parsedItem.Summary != "" {
+		log.Info("Document %s already has a summary, returning cached summary", docID)
+		responseData := &DocumentSummarizeResponse{
+			DocumentID:    docID,
+			ResourcePaths: resourcePaths,
+			Title:         parsedItem.Metadata.Title,
+			Summary:       parsedItem.Summary,
+		}
+		return nil, responseData, nil
+	}
+
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		log.Error("OPENAI_API_KEY environment variable not set")
@@ -63,6 +76,22 @@ func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 		log.Error("Failed to generate summary: %v", err)
 		return nil, nil, err
 	}
+
+	// Update the parsed item with the summary
+	parsedItem.Summary = summary
+
+	// Store the updated parsed item (with summary) back to the database
+	sourceInfo := &models.SourceInfo{
+		ZoteroID: query.ZoteroID,
+		URL:      query.URL,
+	}
+	err = store.StoreParsedItem(ctx, docID, parsedItem, sourceInfo)
+	if err != nil {
+		log.Error("Failed to store summary: %v", err)
+		return nil, nil, err
+	}
+
+	log.Info("Successfully generated and stored summary for document %s", docID)
 
 	responseData := &DocumentSummarizeResponse{
 		DocumentID:    docID,

@@ -175,6 +175,12 @@ func (h *PDFResourceHandler) ReadResource(ctx context.Context, uri string) (*mcp
 		} else {
 			content, err = h.getAllEndnotes(ctx, docID)
 		}
+	case "quotations":
+		if index >= 0 {
+			content, err = h.getQuotation(ctx, docID, index)
+		} else {
+			content, err = h.getAllQuotations(ctx, docID)
+		}
 	default:
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
 	}
@@ -232,15 +238,21 @@ func (h *PDFResourceHandler) getDocumentSummary(ctx context.Context, docID strin
 		return "", err
 	}
 
+	quotations, err := h.store.GetQuotations(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
 	summary := map[string]interface{}{
-		"document_id":    docID,
-		"metadata":       metadata,
-		"page_count":     len(pages),
-		"ref_count":      len(refs),
-		"image_count":    len(images),
-		"table_count":    len(tables),
-		"footnote_count": len(footnotes),
-		"endnote_count":  len(endnotes),
+		"document_id":     docID,
+		"metadata":        metadata,
+		"page_count":      len(pages),
+		"ref_count":       len(refs),
+		"image_count":     len(images),
+		"table_count":     len(tables),
+		"footnote_count":  len(footnotes),
+		"endnote_count":   len(endnotes),
+		"quotation_count": len(quotations),
 		"available_resources": []string{
 			fmt.Sprintf("pdf://%s/metadata", docID),
 			fmt.Sprintf("pdf://%s/pages", docID),
@@ -249,6 +261,7 @@ func (h *PDFResourceHandler) getDocumentSummary(ctx context.Context, docID strin
 			fmt.Sprintf("pdf://%s/tables", docID),
 			fmt.Sprintf("pdf://%s/footnotes", docID),
 			fmt.Sprintf("pdf://%s/endnotes", docID),
+			fmt.Sprintf("pdf://%s/quotations", docID),
 		},
 	}
 
@@ -526,6 +539,39 @@ func (h *PDFResourceHandler) getAllEndnotes(ctx context.Context, docID string) (
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal endnotes: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (h *PDFResourceHandler) getQuotation(ctx context.Context, docID string, quotationIndex int) (string, error) {
+	quotation, err := h.store.GetQuotation(ctx, docID, quotationIndex)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := json.MarshalIndent(quotation, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal quotation: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (h *PDFResourceHandler) getAllQuotations(ctx context.Context, docID string) (string, error) {
+	quotations, err := h.store.GetQuotations(ctx, docID)
+	if err != nil {
+		return "", err
+	}
+
+	result := map[string]interface{}{
+		"quotation_count": len(quotations),
+		"quotations":      quotations,
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal quotations: %w", err)
 	}
 
 	return string(data), nil

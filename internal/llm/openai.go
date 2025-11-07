@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/openai/openai-go/v3"
@@ -511,4 +512,330 @@ func SummarizeItem(ctx context.Context, apiKey string, pdfData *models.ParsedIte
 	}
 	log.Info("Successfully generated summary")
 	return response.OutputText(), nil
+}
+
+// ExtractQuotations extracts representative quotations from a parsed document.
+// For paginated documents (PDFs), it processes pages individually to maintain accurate page numbers.
+// For non-paginated documents, it processes the entire content at once.
+func ExtractQuotations(ctx context.Context, apiKey string, parsedItem *models.ParsedItem, summary string, maxQuotations int, log logger.Logger) ([]models.Quotation, error) {
+	log.Info("Extracting quotations from document: %s (max: %d)", parsedItem.Metadata.Title, maxQuotations)
+
+	// JSON schema for quotation extraction
+	quotationSchema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"quotations": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"quotation_text": map[string]any{"type": "string"},
+						"page_number":    map[string]any{"type": "string"},
+						"context":        map[string]any{"type": "string"},
+						"relevance":      map[string]any{"type": "string"},
+					},
+					"required":             []string{"quotation_text", "page_number", "context", "relevance"},
+					"additionalProperties": false,
+				},
+			},
+		},
+		"required":             []string{"quotations"},
+		"additionalProperties": false,
+	}
+
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+
+	// Check if this is a paginated document (PDF with source page numbers)
+	isPaginated := len(parsedItem.PageNumbers) > 0 && parsedItem.PageNumbers[0] != ""
+
+	var quotations []models.Quotation
+	var err error
+
+	if isPaginated {
+		// Process pages individually for PDFs
+		log.Info("Processing %d pages individually for quotation extraction", len(parsedItem.Pages))
+		quotations, err = extractQuotationsFromPages(ctx, &client, parsedItem, summary, quotationSchema, log)
+	} else {
+		// Process entire content at once for non-paginated documents
+		log.Info("Processing entire document at once for quotation extraction")
+		quotations, err = extractQuotationsFromFullText(ctx, &client, parsedItem, summary, quotationSchema, log)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply max quotations limit if necessary
+	if maxQuotations > 0 && len(quotations) > maxQuotations {
+		log.Info("Found %d quotations, prioritizing to top %d", len(quotations), maxQuotations)
+		quotations, err = prioritizeQuotations(ctx, &client, quotations, parsedItem, summary, maxQuotations, log)
+		if err != nil {
+			log.Error("Failed to prioritize quotations, returning all: %v", err)
+			// Don't fail completely, just return all quotations if prioritization fails
+			return quotations, nil
+		}
+		log.Info("Prioritization complete, returning %d quotations", len(quotations))
+	}
+
+	return quotations, nil
+}
+
+// extractQuotationsFromPages processes each page individually to extract quotations with accurate page numbers
+func extractQuotationsFromPages(ctx context.Context, client *openai.Client, parsedItem *models.ParsedItem, summary string, schema map[string]any, log logger.Logger) ([]models.Quotation, error) {
+	allQuotations := make([]models.Quotation, 0)
+
+	// Process pages in parallel
+	type pageResult struct {
+		pageNum    int
+		quotations []models.Quotation
+		err        error
+	}
+	results := make(chan pageResult, len(parsedItem.Pages))
+
+	for i, pageContent := range parsedItem.Pages {
+		go func(pageIndex int, content string, sourcePageNum string) {
+			log.Debug("Extracting quotations from page %d (source: %s)", pageIndex+1, sourcePageNum)
+
+			prompt := fmt.Sprintf(`You are analyzing page %s of an academic document.
+
+Document Summary:
+%s
+
+Document Title: %s
+Page Content:
+%s
+
+Extract 0-3 representative quotations from this page. A good quotation should be:
+- A direct quote from the text (exact wording)
+- Significant in presenting key arguments, findings, or theoretical contributions
+- Self-contained enough to be meaningful on its own
+- Memorable or well-articulated
+- NOT a citation or reference to other works
+
+For each quotation, provide:
+- quotation_text: The exact quoted text (use quotes around it)
+- page_number: "%s" (the source page number)
+- context: Brief explanation of where this appears (e.g., "in the introduction", "from the methodology section")
+- relevance: Why this quotation is significant (key argument, important finding, etc.)
+
+If there are no suitable quotations on this page, return an empty array.`,
+				sourcePageNum, summary, parsedItem.Metadata.Title, content, sourcePageNum)
+
+			response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+				Model: shared.ChatModelGPT5Mini,
+				Input: responses.ResponseNewParamsInputUnion{
+					OfInputItemList: responses.ResponseInputParam{
+						responses.ResponseInputItemParamOfMessage(
+							responses.ResponseInputMessageContentListParam{
+								responses.ResponseInputContentParamOfInputText(prompt),
+							},
+							"user",
+						),
+					},
+				},
+				Text: responses.ResponseTextConfigParam{
+					Format: responses.ResponseFormatTextConfigParamOfJSONSchema("quotations", schema),
+				},
+			})
+
+			if err != nil {
+				log.Error("Failed to extract quotations from page %d: %v", pageIndex+1, err)
+				results <- pageResult{pageNum: pageIndex, quotations: nil, err: err}
+				return
+			}
+
+			var result struct {
+				Quotations []models.Quotation `json:"quotations"`
+			}
+			outputText := response.OutputText()
+			err = json.Unmarshal([]byte(outputText), &result)
+			if err != nil {
+				log.Error("Failed to parse quotations from page %d: %v", pageIndex+1, err)
+				results <- pageResult{pageNum: pageIndex, quotations: nil, err: err}
+				return
+			}
+
+			log.Debug("Found %d quotations on page %d", len(result.Quotations), pageIndex+1)
+			results <- pageResult{pageNum: pageIndex, quotations: result.Quotations, err: nil}
+		}(i, pageContent, parsedItem.PageNumbers[i])
+	}
+
+	// Collect results
+	pageQuotations := make(map[int][]models.Quotation)
+	for range len(parsedItem.Pages) {
+		result := <-results
+		if result.err != nil {
+			close(results)
+			return nil, result.err
+		}
+		pageQuotations[result.pageNum] = result.quotations
+	}
+	close(results)
+
+	// Aggregate in page order
+	for i := 0; i < len(parsedItem.Pages); i++ {
+		if quotes, ok := pageQuotations[i]; ok {
+			allQuotations = append(allQuotations, quotes...)
+		}
+	}
+
+	log.Info("Successfully extracted %d quotations from %d pages", len(allQuotations), len(parsedItem.Pages))
+	return allQuotations, nil
+}
+
+// extractQuotationsFromFullText processes the entire document at once for non-paginated documents
+func extractQuotationsFromFullText(ctx context.Context, client *openai.Client, parsedItem *models.ParsedItem, summary string, schema map[string]any, log logger.Logger) ([]models.Quotation, error) {
+	fullContent := strings.Join(parsedItem.Pages, "\n")
+
+	prompt := fmt.Sprintf(`You are analyzing an academic document.
+
+Document Summary:
+%s
+
+Document Title: %s
+Full Content:
+%s
+
+Extract 5-15 representative quotations from this document. A good quotation should be:
+- A direct quote from the text (exact wording)
+- Significant in presenting key arguments, findings, or theoretical contributions
+- Self-contained enough to be meaningful on its own
+- Memorable or well-articulated
+- NOT a citation or reference to other works
+- Distributed throughout the document (introduction, body, conclusion)
+
+For each quotation, provide:
+- quotation_text: The exact quoted text (use quotes around it)
+- page_number: "" (empty string since this document doesn't have page numbers)
+- context: Brief explanation of where this appears (e.g., "in the introduction", "from the methodology section")
+- relevance: Why this quotation is significant (key argument, important finding, etc.)`,
+		summary, parsedItem.Metadata.Title, fullContent)
+
+	log.Debug("Calling OpenAI API for full-text quotation extraction")
+	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+		Model: shared.ChatModelGPT5Mini,
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage(
+					responses.ResponseInputMessageContentListParam{
+						responses.ResponseInputContentParamOfInputText(prompt),
+					},
+					"user",
+				),
+			},
+		},
+		Text: responses.ResponseTextConfigParam{
+			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("quotations", schema),
+		},
+	})
+
+	if err != nil {
+		log.Error("Failed to extract quotations: %v", err)
+		return nil, err
+	}
+
+	var result struct {
+		Quotations []models.Quotation `json:"quotations"`
+	}
+	outputText := response.OutputText()
+	err = json.Unmarshal([]byte(outputText), &result)
+	if err != nil {
+		log.Error("Failed to parse quotations: %v", err)
+		return nil, err
+	}
+
+	log.Info("Successfully extracted %d quotations from document", len(result.Quotations))
+	return result.Quotations, nil
+}
+
+// prioritizeQuotations takes a list of quotations and asks the LLM to select the most significant ones
+func prioritizeQuotations(ctx context.Context, client *openai.Client, quotations []models.Quotation, parsedItem *models.ParsedItem, summary string, maxQuotations int, log logger.Logger) ([]models.Quotation, error) {
+	log.Info("Prioritizing %d quotations down to %d", len(quotations), maxQuotations)
+
+	// Build a JSON representation of the quotations for the LLM
+	quotationsJSON, err := json.MarshalIndent(quotations, "", "  ")
+	if err != nil {
+		log.Error("Failed to marshal quotations for prioritization: %v", err)
+		return nil, err
+	}
+
+	prompt := fmt.Sprintf(`You are reviewing quotations extracted from an academic document and need to select the %d most significant ones.
+
+Document Title: %s
+Document Summary:
+%s
+
+All Extracted Quotations:
+%s
+
+Your task is to select the %d MOST significant quotations from the list above. Prioritize quotations that:
+1. Present key arguments or theoretical contributions
+2. Contain important findings or conclusions
+3. Are memorable or particularly well-articulated
+4. Represent different sections of the document (diversity)
+5. Are self-contained and meaningful
+
+Return ONLY the selected quotations in the exact same format (with quotation_text, page_number, context, and relevance preserved exactly as provided). Do not modify the quotation text or metadata.
+
+Select exactly %d quotations (or fewer if there aren't enough high-quality ones).`,
+		maxQuotations, parsedItem.Metadata.Title, summary, string(quotationsJSON), maxQuotations, maxQuotations)
+
+	// JSON schema for the response
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"quotations": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"quotation_text": map[string]any{"type": "string"},
+						"page_number":    map[string]any{"type": "string"},
+						"context":        map[string]any{"type": "string"},
+						"relevance":      map[string]any{"type": "string"},
+					},
+					"required":             []string{"quotation_text", "page_number", "context", "relevance"},
+					"additionalProperties": false,
+				},
+			},
+		},
+		"required":             []string{"quotations"},
+		"additionalProperties": false,
+	}
+
+	log.Debug("Calling OpenAI API for quotation prioritization")
+	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
+		Model: shared.ChatModelGPT5Mini,
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage(
+					responses.ResponseInputMessageContentListParam{
+						responses.ResponseInputContentParamOfInputText(prompt),
+					},
+					"user",
+				),
+			},
+		},
+		Text: responses.ResponseTextConfigParam{
+			Format: responses.ResponseFormatTextConfigParamOfJSONSchema("prioritized_quotations", schema),
+		},
+	})
+
+	if err != nil {
+		log.Error("Failed to prioritize quotations: %v", err)
+		return nil, err
+	}
+
+	var result struct {
+		Quotations []models.Quotation `json:"quotations"`
+	}
+	outputText := response.OutputText()
+	err = json.Unmarshal([]byte(outputText), &result)
+	if err != nil {
+		log.Error("Failed to parse prioritized quotations: %v", err)
+		return nil, err
+	}
+
+	log.Info("Successfully prioritized to %d quotations", len(result.Quotations))
+	return result.Quotations, nil
 }

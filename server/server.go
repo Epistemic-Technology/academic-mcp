@@ -32,6 +32,10 @@ func CreateServer(log logger.Logger) *mcp.Server {
 		return tools.DocumentSummarizeToolHandler(ctx, req, query, store, log)
 	})
 
+	mcp.AddTool(server, tools.DocumentQuotationsTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.DocumentQuotationsQuery) (*mcp.CallToolResult, *tools.DocumentQuotationsResponse, error) {
+		return tools.DocumentQuotationsToolHandler(ctx, req, query, store, log)
+	})
+
 	// Template for document summary
 	server.AddResourceTemplate(&mcp.ResourceTemplate{
 		URITemplate: "pdf://{documentId}",
@@ -167,6 +171,26 @@ func CreateServer(log logger.Logger) *mcp.Server {
 		URITemplate: "pdf://{documentId}/endnotes/{endnoteIndex}",
 		Name:        "pdf-endnote",
 		Description: "A specific endnote from the document (0-indexed)",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for quotations
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/quotations",
+		Name:        "pdf-quotations",
+		Description: "All quotations from the document",
+		MIMEType:    "application/json",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)
+	})
+
+	// Template for individual quotation
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "pdf://{documentId}/quotations/{quotationIndex}",
+		Name:        "pdf-quotation",
+		Description: "A specific quotation from the document (0-indexed)",
 		MIMEType:    "application/json",
 	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		return pdfResourceHandler.ReadResource(ctx, req.Params.URI)

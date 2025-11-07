@@ -47,6 +47,7 @@ func (s *SQLiteStore) initSchema() error {
 		publication TEXT,
 		doi TEXT,
 		abstract TEXT,
+		summary TEXT,
 		zotero_id TEXT,
 		url TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -113,6 +114,17 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS quotations (
+		document_id TEXT NOT NULL,
+		quotation_index INTEGER NOT NULL,
+		quotation_text TEXT,
+		page_number TEXT,
+		context TEXT,
+		relevance TEXT,
+		PRIMARY KEY (document_id, quotation_index),
+		FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_documents_doi ON documents(doi);
 	CREATE INDEX IF NOT EXISTS idx_documents_zotero_id ON documents(zotero_id);
 	`
@@ -140,10 +152,10 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *m
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT OR REPLACE INTO documents (id, title, authors, publication_date, publication, doi, abstract, zotero_id, url)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT OR REPLACE INTO documents (id, title, authors, publication_date, publication, doi, abstract, summary, zotero_id, url)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, docID, item.Metadata.Title, string(authorsJSON), item.Metadata.PublicationDate,
-		item.Metadata.Publication, item.Metadata.DOI, item.Metadata.Abstract,
+		item.Metadata.Publication, item.Metadata.DOI, item.Metadata.Abstract, item.Summary,
 		sourceInfo.ZoteroID, sourceInfo.URL)
 	if err != nil {
 		return fmt.Errorf("failed to insert document: %w", err)
@@ -220,6 +232,17 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *m
 		}
 	}
 
+	// Store quotations
+	for i, quotation := range item.Quotations {
+		_, err = tx.ExecContext(ctx, `
+			INSERT OR REPLACE INTO quotations (document_id, quotation_index, quotation_text, page_number, context, relevance)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, docID, i, quotation.QuotationText, quotation.PageNumber, quotation.Context, quotation.Relevance)
+		if err != nil {
+			return fmt.Errorf("failed to insert quotation %d: %w", i, err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		s.logger.Error("Failed to commit transaction for document %s: %v", docID, err)
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -253,6 +276,24 @@ func (s *SQLiteStore) GetMetadata(ctx context.Context, docID string) (*models.It
 	}
 
 	return &metadata, nil
+}
+
+// GetSummary retrieves the summary for a document by ID
+func (s *SQLiteStore) GetSummary(ctx context.Context, docID string) (string, error) {
+	var summary string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT summary FROM documents
+		WHERE id = ?
+	`, docID).Scan(&summary)
+
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("document not found: %s", docID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to query summary: %w", err)
+	}
+
+	return summary, nil
 }
 
 // GetPage retrieves a specific page by document ID and page number (1-indexed sequential)
@@ -578,6 +619,52 @@ func (s *SQLiteStore) GetEndnote(ctx context.Context, docID string, endnoteIndex
 	return &en, nil
 }
 
+// GetQuotations retrieves all quotations for a document
+func (s *SQLiteStore) GetQuotations(ctx context.Context, docID string) ([]models.Quotation, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT quotation_text, page_number, context, relevance FROM quotations
+		WHERE document_id = ?
+		ORDER BY quotation_index
+	`, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query quotations: %w", err)
+	}
+	defer rows.Close()
+
+	var quotations []models.Quotation
+	for rows.Next() {
+		var q models.Quotation
+		if err := rows.Scan(&q.QuotationText, &q.PageNumber, &q.Context, &q.Relevance); err != nil {
+			return nil, fmt.Errorf("failed to scan quotation: %w", err)
+		}
+		quotations = append(quotations, q)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating quotations: %w", err)
+	}
+
+	return quotations, nil
+}
+
+// GetQuotation retrieves a specific quotation by index (0-indexed)
+func (s *SQLiteStore) GetQuotation(ctx context.Context, docID string, quotationIndex int) (*models.Quotation, error) {
+	var q models.Quotation
+	err := s.db.QueryRowContext(ctx, `
+		SELECT quotation_text, page_number, context, relevance FROM quotations
+		WHERE document_id = ? AND quotation_index = ?
+	`, docID, quotationIndex).Scan(&q.QuotationText, &q.PageNumber, &q.Context, &q.Relevance)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("quotation not found: %s index %d", docID, quotationIndex)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query quotation: %w", err)
+	}
+
+	return &q, nil
+}
+
 // ListDocuments returns a list of all stored document IDs with their metadata
 func (s *SQLiteStore) ListDocuments(ctx context.Context) ([]models.DocumentInfo, error) {
 	rows, err := s.db.QueryContext(ctx, `
@@ -702,6 +789,18 @@ func (s *SQLiteStore) GetParsedItem(ctx context.Context, docID string) (*models.
 		return nil, fmt.Errorf("failed to get endnotes: %w", err)
 	}
 
+	// Get quotations
+	quotations, err := s.GetQuotations(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quotations: %w", err)
+	}
+
+	// Get summary
+	summary, err := s.GetSummary(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get summary: %w", err)
+	}
+
 	// Construct and return ParsedItem
 	return &models.ParsedItem{
 		Metadata:    *metadata,
@@ -712,6 +811,8 @@ func (s *SQLiteStore) GetParsedItem(ctx context.Context, docID string) (*models.
 		Tables:      tables,
 		Footnotes:   footnotes,
 		Endnotes:    endnotes,
+		Quotations:  quotations,
+		Summary:     summary,
 	}, nil
 }
 

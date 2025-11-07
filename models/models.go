@@ -9,6 +9,8 @@ type ParsedItem struct {
 	Tables      []Table      `json:"tables,omitempty"`
 	Footnotes   []Footnote   `json:"footnotes,omitempty"`
 	Endnotes    []Endnote    `json:"endnotes,omitempty"`
+	Quotations  []Quotation  `json:"quotations,omitempty"`
+	Summary     string       `json:"summary,omitempty"` // AI-generated summary of the document
 }
 
 type ParsedPage struct {
@@ -73,6 +75,14 @@ type Endnote struct {
 	Marker     string `json:"marker,omitempty"`      // The endnote marker (e.g., "1", "i", "a")
 	Text       string `json:"text,omitempty"`        // The full text of the endnote
 	PageNumber string `json:"page_number,omitempty"` // The page where this endnote definition appears
+}
+
+// Quotation represents a significant or representative direct quotation from the document
+type Quotation struct {
+	QuotationText string `json:"quotation_text,omitempty"` // The exact quoted text
+	PageNumber    string `json:"page_number,omitempty"`    // The source page number where the quote appears
+	Context       string `json:"context,omitempty"`        // Brief context about where this appears in the document
+	Relevance     string `json:"relevance,omitempty"`      // Explanation of why this quotation is significant
 }
 
 // DocumentData represents a document in various formats

@@ -75,6 +75,12 @@ type Store interface {
 	// GetEndnote retrieves a specific endnote by index (0-indexed)
 	GetEndnote(ctx context.Context, docID string, endnoteIndex int) (*models.Endnote, error)
 
+	// GetQuotations retrieves all quotations for a document
+	GetQuotations(ctx context.Context, docID string) ([]models.Quotation, error)
+
+	// GetQuotation retrieves a specific quotation by index (0-indexed)
+	GetQuotation(ctx context.Context, docID string, quotationIndex int) (*models.Quotation, error)
+
 	// ListDocuments returns a list of all stored document IDs with their metadata
 	ListDocuments(ctx context.Context) ([]models.DocumentInfo, error)
 
