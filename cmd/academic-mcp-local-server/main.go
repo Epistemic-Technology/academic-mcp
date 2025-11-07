@@ -2,16 +2,25 @@ package main
 
 import (
 	"context"
-	"log"
 
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/server"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func main() {
-	server := server.CreateServer()
-	err := server.Run(context.Background(), &mcp.StdioTransport{})
+	// Initialize logger with default configuration
+	log, err := logger.NewLogger(logger.LogConfig{})
 	if err != nil {
-		log.Fatal(err)
+		// Fall back to stderr if logger initialization fails
+		panic(err)
+	}
+
+	log.Info("Starting academic-mcp server")
+
+	srv := server.CreateServer(log)
+	err = srv.Run(context.Background(), &mcp.StdioTransport{})
+	if err != nil {
+		log.Fatal("Server failed: %v", err)
 	}
 }

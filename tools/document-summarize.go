@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Epistemic-Technology/academic-mcp/internal/llm"
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/internal/operations"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -38,10 +39,12 @@ func DocumentSummarizeTool() *mcp.Tool {
 	}
 }
 
-func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest, query DocumentSummarizeQuery, store storage.Store) (*mcp.CallToolResult, *DocumentSummarizeResponse, error) {
+func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest, query DocumentSummarizeQuery, store storage.Store, log logger.Logger) (*mcp.CallToolResult, *DocumentSummarizeResponse, error) {
+	log.Info("document-summarize tool called")
 	// Use the shared helper to get or parse the document
-	docID, parsedItem, err := operations.GetOrParseDocument(ctx, query.ZoteroID, query.URL, query.RawData, query.DocType, store)
+	docID, parsedItem, err := operations.GetOrParseDocument(ctx, query.ZoteroID, query.URL, query.RawData, query.DocType, store, log)
 	if err != nil {
+		log.Error("Failed to get or parse document: %v", err)
 		return nil, nil, err
 	}
 
@@ -50,11 +53,14 @@ func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
+		log.Error("OPENAI_API_KEY environment variable not set")
 		return nil, nil, errors.New("OPENAI_API_KEY environment variable not set")
 	}
 
-	summary, err := llm.SummarizeItem(ctx, apiKey, parsedItem)
+	log.Info("Generating summary for document %s", docID)
+	summary, err := llm.SummarizeItem(ctx, apiKey, parsedItem, log)
 	if err != nil {
+		log.Error("Failed to generate summary: %v", err)
 		return nil, nil, err
 	}
 

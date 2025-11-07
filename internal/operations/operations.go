@@ -8,6 +8,7 @@ import (
 
 	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
 	"github.com/Epistemic-Technology/academic-mcp/internal/llm"
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
@@ -31,7 +32,14 @@ import (
 //   - documentID: The generated document ID
 //   - parsedItem: The parsed document with all extracted data
 //   - error: Any error encountered during the process
-func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byte, docType string, store storage.Store) (string, *models.ParsedItem, error) {
+func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byte, docType string, store storage.Store, log logger.Logger) (string, *models.ParsedItem, error) {
+	if zoteroID != "" {
+		log.Info("Processing document from Zotero: %s", zoteroID)
+	} else if url != "" {
+		log.Info("Processing document from URL: %s", url)
+	} else {
+		log.Info("Processing document from raw data (%d bytes)", len(rawData))
+	}
 	// Prepare source info
 	sourceInfo := &models.SourceInfo{
 		ZoteroID: zoteroID,
@@ -68,35 +76,43 @@ func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byt
 	// Check if document already exists in store
 	exists, err := store.DocumentExists(ctx, docID)
 	if err != nil {
+		log.Error("Failed to check document existence: %v", err)
 		return "", nil, fmt.Errorf("failed to check document existence: %w", err)
 	}
 
 	var parsedItem *models.ParsedItem
 
 	if exists {
+		log.Info("Document %s already exists, retrieving from storage", docID)
 		// Document already parsed, retrieve from store
 		parsedItem, err = store.GetParsedItem(ctx, docID)
 		if err != nil {
+			log.Error("Failed to retrieve existing document %s: %v", docID, err)
 			return "", nil, fmt.Errorf("failed to retrieve existing document: %w", err)
 		}
 	} else {
+		log.Info("Document %s not found, parsing new document (type: %s)", docID, data.Type)
 		// Document needs to be parsed
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
+			log.Error("OPENAI_API_KEY environment variable not set")
 			return "", nil, errors.New("OPENAI_API_KEY environment variable not set")
 		}
 
 		// Parse document using type-specific parser (PDF, HTML, Markdown, Text, etc.)
-		parsedItem, err = llm.ParseDocument(ctx, apiKey, data)
+		parsedItem, err = llm.ParseDocument(ctx, apiKey, data, log)
 		if err != nil {
+			log.Error("Failed to parse document: %v", err)
 			return "", nil, fmt.Errorf("failed to parse document: %w", err)
 		}
 
 		// Store the newly parsed document
 		err = store.StoreParsedItem(ctx, docID, parsedItem, sourceInfo)
 		if err != nil {
+			log.Error("Failed to store parsed document: %v", err)
 			return "", nil, fmt.Errorf("failed to store parsed item: %w", err)
 		}
+		log.Info("Successfully parsed and stored document %s", docID)
 	}
 
 	return docID, parsedItem, nil
@@ -104,6 +120,6 @@ func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byt
 
 // GetOrParsePDF is a convenience wrapper around GetOrParseDocument for PDF-specific use cases.
 // Deprecated: Use GetOrParseDocument instead for better multi-format support.
-func GetOrParsePDF(ctx context.Context, zoteroID, url string, rawData []byte, store storage.Store) (string, *models.ParsedItem, error) {
-	return GetOrParseDocument(ctx, zoteroID, url, rawData, "pdf", store)
+func GetOrParsePDF(ctx context.Context, zoteroID, url string, rawData []byte, store storage.Store, log logger.Logger) (string, *models.ParsedItem, error) {
+	return GetOrParseDocument(ctx, zoteroID, url, rawData, "pdf", store, log)
 }

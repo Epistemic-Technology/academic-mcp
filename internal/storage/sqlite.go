@@ -8,26 +8,30 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
 // SQLiteStore implements the Store interface using SQLite
 type SQLiteStore struct {
-	db *sql.DB
+	db     *sql.DB
+	logger logger.Logger
 }
 
 // NewSQLiteStore creates a new SQLite store
-func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
+func NewSQLiteStore(dbPath string, log logger.Logger) (*SQLiteStore, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	store := &SQLiteStore{db: db}
+	store := &SQLiteStore{db: db, logger: log}
 	if err := store.initSchema(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
+
+	log.Debug("SQLite store initialized successfully")
 
 	return store, nil
 }
@@ -119,8 +123,12 @@ func (s *SQLiteStore) initSchema() error {
 
 // StoreParsedItem stores a parsed PDF with the provided document ID
 func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *models.ParsedItem, sourceInfo *models.SourceInfo) error {
+	s.logger.Info("Storing parsed document: %s (title: %s, pages: %d, refs: %d)",
+		docID, item.Metadata.Title, len(item.Pages), len(item.References))
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		s.logger.Error("Failed to begin transaction for document %s: %v", docID, err)
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
@@ -213,9 +221,11 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *m
 	}
 
 	if err := tx.Commit(); err != nil {
+		s.logger.Error("Failed to commit transaction for document %s: %v", docID, err)
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	s.logger.Debug("Successfully stored document %s", docID)
 	return nil
 }
 
@@ -627,8 +637,10 @@ func (s *SQLiteStore) DocumentExists(ctx context.Context, docID string) (bool, e
 	var exists bool
 	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM documents WHERE id = ?)`, docID).Scan(&exists)
 	if err != nil {
+		s.logger.Error("Failed to check document existence for %s: %v", docID, err)
 		return false, fmt.Errorf("failed to check document existence: %w", err)
 	}
+	s.logger.Debug("Document %s exists: %v", docID, exists)
 	return exists, nil
 }
 

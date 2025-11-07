@@ -3,33 +3,33 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
 	"github.com/Epistemic-Technology/academic-mcp/resources"
 	"github.com/Epistemic-Technology/academic-mcp/tools"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func CreateServer() *mcp.Server {
+func CreateServer(log logger.Logger) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "academic-mcp", Version: "v0.0.1"}, nil)
 
-	store, err := initializeStorage()
+	store, err := initializeStorage(log)
 	if err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
+		log.Fatal("Failed to initialize storage: %v", err)
 	}
 
 	pdfResourceHandler := resources.NewPDFResourceHandler(store)
 
-	// Register tools with storage dependency
+	// Register tools with storage and logger dependencies
 	mcp.AddTool(server, tools.DocumentParseTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.DocumentParseQuery) (*mcp.CallToolResult, *tools.DocumentParseResponse, error) {
-		return tools.DocumentParseToolHandler(ctx, req, query, store)
+		return tools.DocumentParseToolHandler(ctx, req, query, store, log)
 	})
 
 	mcp.AddTool(server, tools.DocumentSummarizeTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.DocumentSummarizeQuery) (*mcp.CallToolResult, *tools.DocumentSummarizeResponse, error) {
-		return tools.DocumentSummarizeToolHandler(ctx, req, query, store)
+		return tools.DocumentSummarizeToolHandler(ctx, req, query, store, log)
 	})
 
 	// Template for document summary
@@ -176,7 +176,7 @@ func CreateServer() *mcp.Server {
 }
 
 // initializeStorage creates and initializes the storage backend
-func initializeStorage() (storage.Store, error) {
+func initializeStorage(log logger.Logger) (storage.Store, error) {
 	// Determine database path
 	dbPath := os.Getenv("ACADEMIC_MCP_DB_PATH")
 	if dbPath == "" {
@@ -192,9 +192,9 @@ func initializeStorage() (storage.Store, error) {
 		dbPath = filepath.Join(dbDir, "academic.db")
 	}
 
-	log.Printf("Initializing SQLite database at: %s", dbPath)
+	log.Info("Initializing SQLite database at: %s", dbPath)
 
-	store, err := storage.NewSQLiteStore(dbPath)
+	store, err := storage.NewSQLiteStore(dbPath, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SQLite store: %w", err)
 	}

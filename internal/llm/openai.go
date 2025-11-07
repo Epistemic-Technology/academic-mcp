@@ -13,6 +13,7 @@ import (
 	"github.com/openai/openai-go/v3/shared"
 
 	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
@@ -228,31 +229,37 @@ IMPORTANT for page numbers: Be conservative. Only report page numbers with high 
 }
 
 // ParseDocument parses a document based on its type and returns a ParsedItem
-func ParseDocument(ctx context.Context, apiKey string, docData models.DocumentData) (*models.ParsedItem, error) {
+func ParseDocument(ctx context.Context, apiKey string, docData models.DocumentData, log logger.Logger) (*models.ParsedItem, error) {
+	log.Info("Parsing document of type: %s", docData.Type)
 	switch docData.Type {
 	case "pdf":
-		return parsePDF(ctx, apiKey, docData)
+		return parsePDF(ctx, apiKey, docData, log)
 	case "html":
-		return parseHTML(ctx, apiKey, docData)
+		return parseHTML(ctx, apiKey, docData, log)
 	case "md":
-		return parseMarkdown(ctx, apiKey, docData)
+		return parseMarkdown(ctx, apiKey, docData, log)
 	case "txt":
-		return parseText(ctx, apiKey, docData)
+		return parseText(ctx, apiKey, docData, log)
 	case "docx":
 		// TODO: Implement DOCX parsing
+		log.Error("Unsupported document type: docx")
 		return nil, errors.New("unsupported document type: docx")
 	default:
+		log.Error("Unsupported document type: %s", docData.Type)
 		return nil, errors.New("unsupported document type")
 	}
 }
 
 // parsePDF parses a PDF document and returns a ParsedItem
-func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (*models.ParsedItem, error) {
+func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData, log logger.Logger) (*models.ParsedItem, error) {
 	// Split the PDF into individual pages
 	pages, err := documents.SplitPdf(pdfData)
 	if err != nil {
+		log.Error("Failed to split PDF into pages: %v", err)
 		return nil, err
 	}
+
+	log.Info("Processing PDF with %d pages (parallel)", len(pages))
 
 	// Create channels for results and errors
 	type pageResult struct {
@@ -265,7 +272,11 @@ func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (
 	// Process each page in parallel
 	for i, page := range pages {
 		go func(pageNum int, pageData *models.DocumentPageData) {
+			log.Debug("Calling OpenAI API for page %d", pageNum+1)
 			parsed, err := ParsePDFPage(ctx, apiKey, pageData)
+			if err != nil {
+				log.Error("Failed to parse page %d: %v", pageNum+1, err)
+			}
 			results <- pageResult{
 				pageNum: pageNum,
 				parsed:  parsed,
@@ -284,6 +295,8 @@ func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (
 		parsedPages[result.pageNum] = result.parsed
 	}
 	close(results)
+
+	log.Info("Successfully parsed all %d pages", len(pages))
 
 	// Validate and determine page numbering scheme
 	pageNumbers := validatePageNumbers(parsedPages)
@@ -333,7 +346,13 @@ func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData) (
 }
 
 // parseHTML parses an HTML document and returns a ParsedItem
-func parseHTML(ctx context.Context, apiKey string, htmlData models.DocumentData) (*models.ParsedItem, error) {
+func parseHTML(ctx context.Context, apiKey string, htmlData models.DocumentData, log logger.Logger) (*models.ParsedItem, error) {
+	log.Info("Parsing HTML document")
+	dataPreview := string(htmlData.Data)
+	if len(dataPreview) > 200 {
+		dataPreview = dataPreview[:200] + "..."
+	}
+	log.Debug("Calling OpenAI API with data length: %d and data preview: %s", len(dataPreview), dataPreview)
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
 		Model: shared.ChatModelGPT5Mini,
@@ -407,7 +426,9 @@ HTML Content:
 }
 
 // parseMarkdown parses a Markdown document and returns a ParsedItem
-func parseMarkdown(ctx context.Context, apiKey string, mdData models.DocumentData) (*models.ParsedItem, error) {
+func parseMarkdown(ctx context.Context, apiKey string, mdData models.DocumentData, log logger.Logger) (*models.ParsedItem, error) {
+	log.Info("Parsing Markdown document")
+	log.Debug("Calling OpenAI API for Markdown parsing")
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
 		Model: shared.ChatModelGPT5Mini,
@@ -479,7 +500,9 @@ Markdown Content:
 }
 
 // parseText parses a plain text document and returns a ParsedItem
-func parseText(ctx context.Context, apiKey string, textData models.DocumentData) (*models.ParsedItem, error) {
+func parseText(ctx context.Context, apiKey string, textData models.DocumentData, log logger.Logger) (*models.ParsedItem, error) {
+	log.Info("Parsing plain text document")
+	log.Debug("Calling OpenAI API for text parsing")
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
 		Model: shared.ChatModelGPT5Mini,
@@ -547,8 +570,10 @@ Text Content:
 	}, nil
 }
 
-func SummarizeItem(ctx context.Context, apiKey string, pdfData *models.ParsedItem) (string, error) {
+func SummarizeItem(ctx context.Context, apiKey string, pdfData *models.ParsedItem, log logger.Logger) (string, error) {
+	log.Info("Generating summary for document: %s", pdfData.Metadata.Title)
 	fullContent := strings.Join(pdfData.Pages, "\n")
+	log.Debug("Calling OpenAI API for summarization (content length: %d chars)", len(fullContent))
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	response, err := client.Responses.New(ctx, responses.ResponseNewParams{
 		Model: shared.ChatModelGPT5Mini,
@@ -566,7 +591,9 @@ func SummarizeItem(ctx context.Context, apiKey string, pdfData *models.ParsedIte
 		},
 	})
 	if err != nil {
+		log.Error("Failed to generate summary: %v", err)
 		return "", err
 	}
+	log.Info("Successfully generated summary")
 	return response.OutputText(), nil
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/models"
 )
 
@@ -204,10 +205,11 @@ func TestParseDocument_Integration(t *testing.T) {
 			}
 
 			// Parse the entire PDF
+			log := logger.NewNoOpLogger()
 			parsedItem, err := ParseDocument(ctx, apiKey, models.DocumentData{
 				Data: pdfBytes,
 				Type: "pdf",
-			})
+			}, log)
 			if err != nil {
 				t.Fatalf("ParseDocument failed: %v", err)
 			}
@@ -284,7 +286,8 @@ func TestParseDocument_InvalidPDF(t *testing.T) {
 		Data: []byte("This is not a PDF"),
 		Type: "pdf",
 	}
-	_, err := ParseDocument(ctx, apiKey, invalidPDF)
+	log := logger.NewNoOpLogger()
+	_, err := ParseDocument(ctx, apiKey, invalidPDF, log)
 	if err == nil {
 		t.Error("Expected error with invalid PDF data, got nil")
 	}
@@ -303,7 +306,8 @@ func TestParseDocument_EmptyPDF(t *testing.T) {
 		Data: []byte{},
 		Type: "pdf",
 	}
-	_, err := ParseDocument(ctx, apiKey, emptyPDF)
+	log := logger.NewNoOpLogger()
+	_, err := ParseDocument(ctx, apiKey, emptyPDF, log)
 	if err == nil {
 		t.Error("Expected error with empty PDF data, got nil")
 	}
@@ -424,10 +428,11 @@ func TestParseDocument_ConcurrentPageProcessing(t *testing.T) {
 			expectedPageCount := len(pages)
 
 			// Parse the entire PDF (which processes pages concurrently)
+			log := logger.NewNoOpLogger()
 			parsedItem, err := ParseDocument(ctx, apiKey, models.DocumentData{
 				Data: pdfBytes,
 				Type: "pdf",
-			})
+			}, log)
 			if err != nil {
 				t.Fatalf("ParseDocument failed: %v", err)
 			}

@@ -6,6 +6,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
 	"github.com/Epistemic-Technology/academic-mcp/internal/operations"
 	"github.com/Epistemic-Technology/academic-mcp/internal/storage"
 )
@@ -39,10 +40,12 @@ func DocumentParseTool() *mcp.Tool {
 	}
 }
 
-func DocumentParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query DocumentParseQuery, store storage.Store) (*mcp.CallToolResult, *DocumentParseResponse, error) {
+func DocumentParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, query DocumentParseQuery, store storage.Store, log logger.Logger) (*mcp.CallToolResult, *DocumentParseResponse, error) {
+	log.Info("document-parse tool called")
 	// Use the shared helper to get or parse the document
-	docID, parsedItem, err := operations.GetOrParseDocument(ctx, query.ZoteroID, query.URL, query.RawData, query.DocType, store)
+	docID, parsedItem, err := operations.GetOrParseDocument(ctx, query.ZoteroID, query.URL, query.RawData, query.DocType, store, log)
 	if err != nil {
+		log.Error("document-parse tool failed: %v", err)
 		return nil, nil, err
 	}
 

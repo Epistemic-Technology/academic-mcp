@@ -4,7 +4,9 @@
       "type": "stdio",
       "command": "/Users/mikethicke/github/academic-mcp/bin/academic-mcp-local-server",
       "args": [],
-      "env": {}
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
     }
   }
 }
