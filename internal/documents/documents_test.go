@@ -1,6 +1,8 @@
 package documents
 
 import (
+	"archive/zip"
+	"bytes"
 	"testing"
 )
 
@@ -137,5 +139,184 @@ func TestIsLikelyText(t *testing.T) {
 				t.Errorf("isLikelyText() = %v, want %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+// createTestZip creates a ZIP archive with the given files for testing
+func createTestZip(files map[string]string) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+
+	for filename, content := range files {
+		f, err := w.Create(filename)
+		if err != nil {
+			return nil, err
+		}
+		_, err = f.Write([]byte(content))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err := w.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func TestExtractHTMLFromZip(t *testing.T) {
+	tests := []struct {
+		name        string
+		files       map[string]string
+		expectError bool
+		expected    string
+	}{
+		{
+			name: "ZIP with index.html",
+			files: map[string]string{
+				"index.html": "<html><body>Main page</body></html>",
+				"style.css":  "body { color: red; }",
+				"image.png":  "fake image data",
+			},
+			expectError: false,
+			expected:    "<html><body>Main page</body></html>",
+		},
+		{
+			name: "ZIP with other.html but no index.html",
+			files: map[string]string{
+				"page.html": "<html><body>Other page</body></html>",
+				"style.css": "body { color: blue; }",
+			},
+			expectError: false,
+			expected:    "<html><body>Other page</body></html>",
+		},
+		{
+			name: "ZIP with multiple HTML files (prefers index.html)",
+			files: map[string]string{
+				"index.html": "<html><body>Index page</body></html>",
+				"other.html": "<html><body>Other page</body></html>",
+			},
+			expectError: false,
+			expected:    "<html><body>Index page</body></html>",
+		},
+		{
+			name: "ZIP with no HTML files",
+			files: map[string]string{
+				"data.json": `{"key": "value"}`,
+				"style.css": "body { color: green; }",
+			},
+			expectError: true,
+		},
+		{
+			name: "ZIP with .htm extension",
+			files: map[string]string{
+				"page.htm": "<html><body>HTM page</body></html>",
+			},
+			expectError: false,
+			expected:    "<html><body>HTM page</body></html>",
+		},
+		{
+			name: "ZIP with subdirectory",
+			files: map[string]string{
+				"subdir/index.html": "<html><body>Nested page</body></html>",
+			},
+			expectError: false,
+			expected:    "<html><body>Nested page</body></html>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zipData, err := createTestZip(tt.files)
+			if err != nil {
+				t.Fatalf("Failed to create test ZIP: %v", err)
+			}
+
+			result, err := ExtractHTMLFromZip(zipData)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("ExtractHTMLFromZip() expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ExtractHTMLFromZip() unexpected error: %v", err)
+				}
+				if string(result) != tt.expected {
+					t.Errorf("ExtractHTMLFromZip() = %q, want %q", string(result), tt.expected)
+				}
+			}
+		})
+	}
+}
+
+func TestIsZoteroSnapshotZip(t *testing.T) {
+	tests := []struct {
+		name     string
+		files    map[string]string
+		expected bool
+	}{
+		{
+			name: "ZIP with HTML file",
+			files: map[string]string{
+				"index.html": "<html><body>Test</body></html>",
+				"style.css":  "body { }",
+			},
+			expected: true,
+		},
+		{
+			name: "ZIP with .htm file",
+			files: map[string]string{
+				"page.htm": "<html><body>Test</body></html>",
+			},
+			expected: true,
+		},
+		{
+			name: "ZIP without HTML files",
+			files: map[string]string{
+				"data.json": `{"key": "value"}`,
+				"image.png": "fake image",
+			},
+			expected: false,
+		},
+		{
+			name: "ZIP with HTML in subdirectory",
+			files: map[string]string{
+				"assets/page.html": "<html><body>Test</body></html>",
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zipData, err := createTestZip(tt.files)
+			if err != nil {
+				t.Fatalf("Failed to create test ZIP: %v", err)
+			}
+
+			result := isZoteroSnapshotZip(zipData)
+			if result != tt.expected {
+				t.Errorf("isZoteroSnapshotZip() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectDocumentType_ZoteroSnapshot(t *testing.T) {
+	// Create a test ZIP with HTML
+	zipData, err := createTestZip(map[string]string{
+		"index.html": "<html><body>Zotero snapshot</body></html>",
+		"style.css":  "body { color: black; }",
+	})
+	if err != nil {
+		t.Fatalf("Failed to create test ZIP: %v", err)
+	}
+
+	result := DetectDocumentType(zipData)
+	if result != "zotero-snapshot" {
+		t.Errorf("DetectDocumentType() for Zotero snapshot = %v, want zotero-snapshot", result)
 	}
 }

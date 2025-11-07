@@ -28,8 +28,8 @@ func CreateServer() *mcp.Server {
 		return tools.DocumentParseToolHandler(ctx, req, query, store)
 	})
 
-	mcp.AddTool(server, tools.PDFSummarizeTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.PDFSummarizeQuery) (*mcp.CallToolResult, *tools.PDFSummarizeResponse, error) {
-		return tools.PDFSummarizeToolHandler(ctx, req, query, store)
+	mcp.AddTool(server, tools.DocumentSummarizeTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.DocumentSummarizeQuery) (*mcp.CallToolResult, *tools.DocumentSummarizeResponse, error) {
+		return tools.DocumentSummarizeToolHandler(ctx, req, query, store)
 	})
 
 	// Template for document summary

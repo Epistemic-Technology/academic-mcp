@@ -17,8 +17,6 @@ import (
 )
 
 var (
-	// ErrUnsupportedDocumentType is returned when attempting to parse a document type that is not yet supported
-	ErrUnsupportedDocumentType = errors.New("unsupported document type")
 
 	// parsedDocumentSchema is the unified JSON schema for parsing all document types
 	// For non-PDF documents: page_number_info fields will be empty/zero values
@@ -242,9 +240,9 @@ func ParseDocument(ctx context.Context, apiKey string, docData models.DocumentDa
 		return parseText(ctx, apiKey, docData)
 	case "docx":
 		// TODO: Implement DOCX parsing
-		return nil, ErrUnsupportedDocumentType
+		return nil, errors.New("unsupported document type: docx")
 	default:
-		return nil, ErrUnsupportedDocumentType
+		return nil, errors.New("unsupported document type")
 	}
 }
 
