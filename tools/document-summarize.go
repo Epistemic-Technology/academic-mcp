@@ -25,6 +25,7 @@ type DocumentSummarizeResponse struct {
 	DocumentID    string   `json:"document_id,omitempty"`
 	ResourcePaths []string `json:"resource_paths,omitempty"`
 	Title         string   `json:"title,omitempty"`
+	Citekey       string   `json:"citekey,omitempty"`
 	Summary       string   `json:"summary,omitempty"`
 }
 
@@ -59,6 +60,7 @@ func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 			DocumentID:    docID,
 			ResourcePaths: resourcePaths,
 			Title:         parsedItem.Metadata.Title,
+			Citekey:       parsedItem.Metadata.Citekey,
 			Summary:       parsedItem.Summary,
 		}
 		return nil, responseData, nil
@@ -97,6 +99,7 @@ func DocumentSummarizeToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 		DocumentID:    docID,
 		ResourcePaths: resourcePaths,
 		Title:         parsedItem.Metadata.Title,
+		Citekey:       parsedItem.Metadata.Citekey,
 		Summary:       summary,
 	}
 

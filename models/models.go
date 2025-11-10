@@ -54,6 +54,9 @@ type ItemMetadata struct {
 	ISBN      string `json:"isbn,omitempty"`
 	URL       string `json:"url,omitempty"`
 
+	// Citation information
+	Citekey string `json:"citekey,omitempty"` // Pandoc-style citekey (e.g., "smith2020", "smithJones2021")
+
 	// Metadata source tracking
 	MetadataSource string `json:"metadata_source,omitempty"` // "zotero", "extracted", "merged"
 }

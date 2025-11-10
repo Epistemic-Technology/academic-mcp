@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Epistemic-Technology/academic-mcp/internal/citations"
 	"github.com/Epistemic-Technology/academic-mcp/internal/documents"
 	"github.com/Epistemic-Technology/academic-mcp/internal/llm"
 	"github.com/Epistemic-Technology/academic-mcp/internal/logger"
@@ -126,6 +127,22 @@ func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byt
 			// Mark as extracted if no external metadata
 			parsedItem.Metadata.MetadataSource = "extracted"
 		}
+
+		// Generate citekey for the document
+		citekeyMap, err := store.GetCitekeyMap(ctx)
+		if err != nil {
+			log.Error("Failed to retrieve existing citekeys: %v", err)
+			return "", nil, fmt.Errorf("failed to retrieve existing citekeys: %w", err)
+		}
+		// Build a set of existing citekeys for collision detection
+		existingCitekeys := make(map[string]bool)
+		for _, citekey := range citekeyMap {
+			existingCitekeys[citekey] = true
+		}
+		// Generate citekey
+		citekey := citations.GenerateCitekey(&parsedItem.Metadata, existingCitekeys)
+		parsedItem.Metadata.Citekey = citekey
+		log.Info("Generated citekey for document: %s", citekey)
 
 		// Store the newly parsed document
 		err = store.StoreParsedItem(ctx, docID, parsedItem, sourceInfo)

@@ -26,6 +26,7 @@ type DocumentQuotationsResponse struct {
 	DocumentID     string             `json:"document_id,omitempty"`
 	ResourcePaths  []string           `json:"resource_paths,omitempty"`
 	Title          string             `json:"title,omitempty"`
+	Citekey        string             `json:"citekey,omitempty"`
 	Quotations     []models.Quotation `json:"quotations,omitempty"`
 	QuotationCount int                `json:"quotation_count"`
 }
@@ -70,6 +71,7 @@ func DocumentQuotationsToolHandler(ctx context.Context, req *mcp.CallToolRequest
 			DocumentID:     docID,
 			ResourcePaths:  resourcePaths,
 			Title:          parsedItem.Metadata.Title,
+			Citekey:        parsedItem.Metadata.Citekey,
 			Quotations:     parsedItem.Quotations,
 			QuotationCount: len(parsedItem.Quotations),
 		}
@@ -122,6 +124,7 @@ func DocumentQuotationsToolHandler(ctx context.Context, req *mcp.CallToolRequest
 		DocumentID:     docID,
 		ResourcePaths:  resourcePaths,
 		Title:          parsedItem.Metadata.Title,
+		Citekey:        parsedItem.Metadata.Citekey,
 		Quotations:     quotations,
 		QuotationCount: len(quotations),
 	}

@@ -34,6 +34,7 @@ type ZoteroItemResult struct {
 	ItemType    string           `json:"item_type"`
 	Date        string           `json:"date,omitempty"`
 	Attachments []AttachmentInfo `json:"attachments,omitempty"`
+	Citekey     string           `json:"citekey,omitempty"` // Citekey if document has been parsed
 }
 
 type AttachmentInfo struct {
@@ -85,6 +86,24 @@ func ZoteroSearchToolHandler(ctx context.Context, req *mcp.CallToolRequest, quer
 		return nil, nil, err
 	}
 
+	// Get existing citekeys for all documents
+	citekeyMap, err := store.GetCitekeyMap(ctx)
+	if err != nil {
+		log.Error("Failed to retrieve citekey map: %v", err)
+		// Don't fail the whole request, just skip citekey enrichment
+		citekeyMap = make(map[string]string)
+	}
+
+	// Build a reverse map from zotero_id to citekey
+	zoteroToCitekey := make(map[string]string)
+	for docID, citekey := range citekeyMap {
+		// Extract zotero ID from document ID (format: "zotero_XXXXX")
+		if len(docID) > 7 && docID[:7] == "zotero_" {
+			zoteroID := docID[7:]
+			zoteroToCitekey[zoteroID] = citekey
+		}
+	}
+
 	// Convert internal results to tool response format
 	results := make([]ZoteroItemResult, len(items))
 	for i, item := range items {
@@ -95,7 +114,7 @@ func ZoteroSearchToolHandler(ctx context.Context, req *mcp.CallToolRequest, quer
 			ItemType: item.ItemType,
 			Date:     item.Date,
 		}
-		// Convert attachments
+		// Convert attachments and check for citekeys
 		for _, att := range item.Attachments {
 			results[i].Attachments = append(results[i].Attachments, AttachmentInfo{
 				Key:         att.Key,
@@ -103,6 +122,10 @@ func ZoteroSearchToolHandler(ctx context.Context, req *mcp.CallToolRequest, quer
 				ContentType: att.ContentType,
 				LinkMode:    att.LinkMode,
 			})
+			// If this attachment has been parsed, add citekey to the result
+			if citekey, found := zoteroToCitekey[att.Key]; found {
+				results[i].Citekey = citekey
+			}
 		}
 	}
 

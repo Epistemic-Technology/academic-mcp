@@ -59,6 +59,7 @@ func (s *SQLiteStore) initSchema() error {
 		isbn TEXT,
 		metadata_url TEXT,
 		metadata_source TEXT,
+		citekey TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -136,6 +137,7 @@ func (s *SQLiteStore) initSchema() error {
 
 	CREATE INDEX IF NOT EXISTS idx_documents_doi ON documents(doi);
 	CREATE INDEX IF NOT EXISTS idx_documents_zotero_id ON documents(zotero_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_citekey ON documents(citekey) WHERE citekey IS NOT NULL;
 	`
 
 	_, err := s.db.Exec(schema)
@@ -164,14 +166,14 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *m
 		INSERT OR REPLACE INTO documents (
 			id, title, authors, publication_date, publication, doi, abstract, summary,
 			zotero_id, url, item_type, publisher, volume, issue, pages, issn, isbn,
-			metadata_url, metadata_source
+			metadata_url, metadata_source, citekey
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, docID, item.Metadata.Title, string(authorsJSON), item.Metadata.PublicationDate,
 		item.Metadata.Publication, item.Metadata.DOI, item.Metadata.Abstract, item.Summary,
 		sourceInfo.ZoteroID, sourceInfo.URL, item.Metadata.ItemType, item.Metadata.Publisher,
 		item.Metadata.Volume, item.Metadata.Issue, item.Metadata.Pages, item.Metadata.ISSN,
-		item.Metadata.ISBN, item.Metadata.URL, item.Metadata.MetadataSource)
+		item.Metadata.ISBN, item.Metadata.URL, item.Metadata.MetadataSource, item.Metadata.Citekey)
 	if err != nil {
 		return fmt.Errorf("failed to insert document: %w", err)
 	}
@@ -274,13 +276,13 @@ func (s *SQLiteStore) GetMetadata(ctx context.Context, docID string) (*models.It
 
 	err := s.db.QueryRowContext(ctx, `
 		SELECT title, authors, publication_date, publication, doi, abstract,
-		       item_type, publisher, volume, issue, pages, issn, isbn, metadata_url, metadata_source
+		       item_type, publisher, volume, issue, pages, issn, isbn, metadata_url, metadata_source, citekey
 		FROM documents
 		WHERE id = ?
 	`, docID).Scan(&metadata.Title, &authorsJSON, &metadata.PublicationDate,
 		&metadata.Publication, &metadata.DOI, &metadata.Abstract,
 		&metadata.ItemType, &metadata.Publisher, &metadata.Volume, &metadata.Issue,
-		&metadata.Pages, &metadata.ISSN, &metadata.ISBN, &metadata.URL, &metadata.MetadataSource)
+		&metadata.Pages, &metadata.ISSN, &metadata.ISBN, &metadata.URL, &metadata.MetadataSource, &metadata.Citekey)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("document not found: %s", docID)
@@ -832,6 +834,51 @@ func (s *SQLiteStore) GetParsedItem(ctx context.Context, docID string) (*models.
 		Quotations:  quotations,
 		Summary:     summary,
 	}, nil
+}
+
+// GetCitekeyMap retrieves all docID→citekey mappings
+func (s *SQLiteStore) GetCitekeyMap(ctx context.Context) (map[string]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, citekey FROM documents
+		WHERE citekey IS NOT NULL AND citekey != ''
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query citekey map: %w", err)
+	}
+	defer rows.Close()
+
+	citekeyMap := make(map[string]string)
+	for rows.Next() {
+		var docID, citekey string
+		if err := rows.Scan(&docID, &citekey); err != nil {
+			return nil, fmt.Errorf("failed to scan citekey map: %w", err)
+		}
+		citekeyMap[docID] = citekey
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating citekey map: %w", err)
+	}
+
+	return citekeyMap, nil
+}
+
+// GetDocumentByCitekey retrieves a document ID by its citekey
+func (s *SQLiteStore) GetDocumentByCitekey(ctx context.Context, citekey string) (string, error) {
+	var docID string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id FROM documents
+		WHERE citekey = ?
+	`, citekey).Scan(&docID)
+
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("document not found with citekey: %s", citekey)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to query document by citekey: %w", err)
+	}
+
+	return docID, nil
 }
 
 // Close closes the database connection

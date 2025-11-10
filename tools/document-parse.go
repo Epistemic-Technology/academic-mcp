@@ -22,6 +22,7 @@ type DocumentParseResponse struct {
 	DocumentID    string   `json:"document_id"`
 	ResourcePaths []string `json:"resource_paths"`
 	Title         string   `json:"title,omitempty"`
+	Citekey       string   `json:"citekey,omitempty"`
 	PageCount     int      `json:"page_count"`
 	RefCount      int      `json:"reference_count"`
 	ImageCount    int      `json:"image_count"`
@@ -57,6 +58,7 @@ func DocumentParseToolHandler(ctx context.Context, req *mcp.CallToolRequest, que
 		DocumentID:    docID,
 		ResourcePaths: resourcePaths,
 		Title:         parsedItem.Metadata.Title,
+		Citekey:       parsedItem.Metadata.Citekey,
 		PageCount:     len(parsedItem.Pages),
 		RefCount:      len(parsedItem.References),
 		ImageCount:    len(parsedItem.Images),

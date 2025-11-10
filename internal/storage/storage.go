@@ -93,6 +93,12 @@ type Store interface {
 	// GetParsedItem retrieves a complete ParsedItem for a document by ID
 	GetParsedItem(ctx context.Context, docID string) (*models.ParsedItem, error)
 
+	// GetCitekeyMap retrieves all docID→citekey mappings
+	GetCitekeyMap(ctx context.Context) (map[string]string, error)
+
+	// GetDocumentByCitekey retrieves a document ID by its citekey
+	GetDocumentByCitekey(ctx context.Context, citekey string) (string, error)
+
 	// Close closes the database connection
 	Close() error
 }
