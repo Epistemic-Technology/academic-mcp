@@ -50,6 +50,15 @@ func (s *SQLiteStore) initSchema() error {
 		summary TEXT,
 		zotero_id TEXT,
 		url TEXT,
+		item_type TEXT,
+		publisher TEXT,
+		volume TEXT,
+		issue TEXT,
+		pages TEXT,
+		issn TEXT,
+		isbn TEXT,
+		metadata_url TEXT,
+		metadata_source TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -152,11 +161,17 @@ func (s *SQLiteStore) StoreParsedItem(ctx context.Context, docID string, item *m
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT OR REPLACE INTO documents (id, title, authors, publication_date, publication, doi, abstract, summary, zotero_id, url)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT OR REPLACE INTO documents (
+			id, title, authors, publication_date, publication, doi, abstract, summary,
+			zotero_id, url, item_type, publisher, volume, issue, pages, issn, isbn,
+			metadata_url, metadata_source
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, docID, item.Metadata.Title, string(authorsJSON), item.Metadata.PublicationDate,
 		item.Metadata.Publication, item.Metadata.DOI, item.Metadata.Abstract, item.Summary,
-		sourceInfo.ZoteroID, sourceInfo.URL)
+		sourceInfo.ZoteroID, sourceInfo.URL, item.Metadata.ItemType, item.Metadata.Publisher,
+		item.Metadata.Volume, item.Metadata.Issue, item.Metadata.Pages, item.Metadata.ISSN,
+		item.Metadata.ISBN, item.Metadata.URL, item.Metadata.MetadataSource)
 	if err != nil {
 		return fmt.Errorf("failed to insert document: %w", err)
 	}
@@ -258,11 +273,14 @@ func (s *SQLiteStore) GetMetadata(ctx context.Context, docID string) (*models.It
 	var authorsJSON string
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT title, authors, publication_date, publication, doi, abstract
+		SELECT title, authors, publication_date, publication, doi, abstract,
+		       item_type, publisher, volume, issue, pages, issn, isbn, metadata_url, metadata_source
 		FROM documents
 		WHERE id = ?
 	`, docID).Scan(&metadata.Title, &authorsJSON, &metadata.PublicationDate,
-		&metadata.Publication, &metadata.DOI, &metadata.Abstract)
+		&metadata.Publication, &metadata.DOI, &metadata.Abstract,
+		&metadata.ItemType, &metadata.Publisher, &metadata.Volume, &metadata.Issue,
+		&metadata.Pages, &metadata.ISSN, &metadata.ISBN, &metadata.URL, &metadata.MetadataSource)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("document not found: %s", docID)

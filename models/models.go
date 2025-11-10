@@ -43,6 +43,19 @@ type ItemMetadata struct {
 	Publication     string   `json:"publication,omitempty"`
 	DOI             string   `json:"doi,omitempty"`
 	Abstract        string   `json:"abstract,omitempty"`
+
+	// Additional bibliographic fields (primarily from external sources like Zotero)
+	ItemType  string `json:"item_type,omitempty"` // e.g., "book", "article", "conferencePaper"
+	Publisher string `json:"publisher,omitempty"`
+	Volume    string `json:"volume,omitempty"`
+	Issue     string `json:"issue,omitempty"`
+	Pages     string `json:"pages,omitempty"`
+	ISSN      string `json:"issn,omitempty"`
+	ISBN      string `json:"isbn,omitempty"`
+	URL       string `json:"url,omitempty"`
+
+	// Metadata source tracking
+	MetadataSource string `json:"metadata_source,omitempty"` // "zotero", "extracted", "merged"
 }
 
 type Reference struct {

@@ -104,27 +104,46 @@ func isLikelyText(data []byte) bool {
 
 // GetData retrieves document data from a source and detects its type
 func GetData(ctx context.Context, sourceInfo models.SourceInfo) (models.DocumentData, error) {
+	docData, _, err := GetDataWithMetadata(ctx, sourceInfo)
+	return docData, err
+}
+
+// GetDataWithMetadata retrieves document data from a source and detects its type,
+// also returning external metadata if available (e.g., from Zotero).
+// Returns the document data and external metadata (nil if not available).
+func GetDataWithMetadata(ctx context.Context, sourceInfo models.SourceInfo) (models.DocumentData, *models.ItemMetadata, error) {
 	var data []byte
 	var err error
+	var externalMetadata *models.ItemMetadata
 
 	if sourceInfo.ZoteroID != "" {
 		zoteroAPIKey := os.Getenv("ZOTERO_API_KEY")
 		libraryID := os.Getenv("ZOTERO_LIBRARY_ID")
+
+		// Fetch document data
 		data, err = GetFromZotero(ctx, sourceInfo.ZoteroID, zoteroAPIKey, libraryID)
 		if err != nil {
-			return models.DocumentData{}, err
+			return models.DocumentData{}, nil, err
+		}
+
+		// Fetch external metadata from Zotero
+		externalMetadata, err = FetchZoteroMetadata(ctx, sourceInfo.ZoteroID, zoteroAPIKey, libraryID)
+		if err != nil {
+			// Log error but don't fail - we can still parse without external metadata
+			// The error will be logged by the caller
+			externalMetadata = nil
 		}
 	} else if sourceInfo.URL != "" {
 		data, err = GetFromURL(ctx, sourceInfo.URL)
 		if err != nil {
-			return models.DocumentData{}, err
+			return models.DocumentData{}, nil, err
 		}
 	} else {
-		return models.DocumentData{}, errors.New("no data provided")
+		return models.DocumentData{}, nil, errors.New("no data provided")
 	}
 
 	if data == nil {
-		return models.DocumentData{}, errors.New("no data retrieved")
+		return models.DocumentData{}, nil, errors.New("no data retrieved")
 	}
 
 	// Detect document type from content
@@ -134,19 +153,19 @@ func GetData(ctx context.Context, sourceInfo models.SourceInfo) (models.Document
 	if docType == "zotero-snapshot" {
 		htmlData, err := ExtractHTMLFromZip(data)
 		if err != nil {
-			return models.DocumentData{}, fmt.Errorf("failed to extract HTML from Zotero snapshot: %w", err)
+			return models.DocumentData{}, nil, fmt.Errorf("failed to extract HTML from Zotero snapshot: %w", err)
 		}
 		// Return the extracted HTML with type "html"
 		return models.DocumentData{
 			Data: htmlData,
 			Type: "html",
-		}, nil
+		}, externalMetadata, nil
 	}
 
 	return models.DocumentData{
 		Data: data,
 		Type: docType,
-	}, nil
+	}, externalMetadata, nil
 }
 
 // GetFromURL fetches document data from a URL

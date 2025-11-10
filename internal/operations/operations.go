@@ -48,7 +48,9 @@ func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byt
 
 	// Get document data from appropriate source
 	var data models.DocumentData
+	var externalMetadata *models.ItemMetadata
 	var err error
+
 	if rawData != nil {
 		// If docType is provided, use it; otherwise auto-detect
 		detectedType := docType
@@ -59,14 +61,24 @@ func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byt
 			Data: rawData,
 			Type: detectedType,
 		}
+		// No external metadata for raw data
+		externalMetadata = nil
 	} else {
-		data, err = documents.GetData(ctx, *sourceInfo)
+		// Fetch both data and external metadata (if available)
+		data, externalMetadata, err = documents.GetDataWithMetadata(ctx, *sourceInfo)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to fetch document data: %w", err)
 		}
 		// Override detected type if docType parameter is provided
 		if docType != "" {
 			data.Type = docType
+		}
+
+		// Log metadata fetch result
+		if externalMetadata != nil {
+			log.Info("Retrieved external metadata from %s for document", externalMetadata.MetadataSource)
+		} else {
+			log.Debug("No external metadata available")
 		}
 	}
 
@@ -104,6 +116,15 @@ func GetOrParseDocument(ctx context.Context, zoteroID, url string, rawData []byt
 		if err != nil {
 			log.Error("Failed to parse document: %v", err)
 			return "", nil, fmt.Errorf("failed to parse document: %w", err)
+		}
+
+		// Merge external metadata with extracted metadata (if external metadata is available)
+		if externalMetadata != nil {
+			log.Info("Merging external metadata with extracted metadata")
+			parsedItem.Metadata = *documents.MergeMetadata(externalMetadata, &parsedItem.Metadata)
+		} else if parsedItem.Metadata.MetadataSource == "" {
+			// Mark as extracted if no external metadata
+			parsedItem.Metadata.MetadataSource = "extracted"
 		}
 
 		// Store the newly parsed document
