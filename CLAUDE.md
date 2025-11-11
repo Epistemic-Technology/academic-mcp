@@ -186,38 +186,59 @@ After parsing, document content is accessible via standardized URIs:
 ## Available Tools
 
 ### document-parse
-Parses a document (PDF, HTML, Markdown, plain text, or DOCX) and extracts structured data including metadata, content, references, images, tables, footnotes, and endnotes. The parsed document is stored in SQLite and accessible via resource URIs.
+Parses one or more documents (PDF, HTML, Markdown, plain text, or DOCX) and extracts structured data including metadata, content, references, images, tables, footnotes, and endnotes. The parsed document is stored in SQLite and accessible via resource URIs. Multiple documents are processed concurrently.
 
-**Input Parameters** (mutually exclusive):
-- `zotero_id`: Fetch document from Zotero library (auto-detects type, handles web archives)
-- `url`: Download document from URL
-- `raw_data`: Raw document bytes
-- `doc_type`: Optional type override (e.g., "pdf", "html", "md", "txt")
+**Input Parameters**:
+- **Single document mode** (backward compatible):
+  - `zotero_id`: Fetch document from Zotero library (auto-detects type, handles web archives)
+  - `url`: Download document from URL
+  - `raw_data`: Raw document bytes
+  - `doc_type`: Optional type override (e.g., "pdf", "html", "md", "txt")
+- **Batch mode**:
+  - `documents`: Array of document inputs, each with `zotero_id`, `url`, `raw_data`, and `doc_type` fields
 
-**Returns**: Document ID, resource URIs, title, and content statistics (page count, reference count, etc.).
+**Returns**: 
+- `results`: Array of results, each containing document ID, resource URIs, title, and content statistics (page count, reference count, etc.), or error message
+- `count`: Number of documents processed
+
+**Context Handling**: All operations respect context cancellation, allowing clients to cancel long-running batch operations.
 
 ### document-summarize
-Generates a concise 1-3 paragraph summary of a document using GPT-5 Mini. If the document hasn't been parsed yet, it will automatically parse it first using `GetOrParseDocument()`. The summary uses a detached academic tone and expository prose. Supports all document types (PDF, HTML, Markdown, plain text).
+Generates a concise 1-3 paragraph summary of one or more documents using GPT-5 Mini. If the document hasn't been parsed yet, it will automatically parse it first using `GetOrParseDocument()`. The summary uses a detached academic tone and expository prose. Supports all document types (PDF, HTML, Markdown, plain text). Multiple documents are processed concurrently.
 
-**Input Parameters** (mutually exclusive):
-- `zotero_id`: Fetch document from Zotero library
-- `url`: Download document from URL
-- `raw_data`: Raw document bytes
-- `doc_type`: Optional type override
+**Input Parameters**:
+- **Single document mode** (backward compatible):
+  - `zotero_id`: Fetch document from Zotero library
+  - `url`: Download document from URL
+  - `raw_data`: Raw document bytes
+  - `doc_type`: Optional type override
+- **Batch mode**:
+  - `documents`: Array of document inputs, each with `zotero_id`, `url`, `raw_data`, and `doc_type` fields
 
-**Returns**: Document ID, resource URIs, document title, and generated summary.
+**Returns**: 
+- `results`: Array of results, each containing document ID, resource URIs, document title, and generated summary, or error message
+- `count`: Number of documents processed
+
+**Context Handling**: All operations respect context cancellation, allowing clients to cancel long-running batch operations.
 
 ### document-quotations
-Extracts representative quotations from a document (PDF, HTML, Markdown, plain text, or DOCX). The document is parsed and summarized first, then an LLM identifies significant quotations with page numbers (for paginated documents). Supports all document types. Use `max_quotations` to limit results (default: 10, 0 = unlimited).
+Extracts representative quotations from one or more documents (PDF, HTML, Markdown, plain text, or DOCX). The document is parsed and summarized first, then an LLM identifies significant quotations with page numbers (for paginated documents). Supports all document types. Use `max_quotations` to limit results (default: 10, 0 = unlimited). Multiple documents are processed concurrently.
 
-**Input Parameters** (mutually exclusive):
-- `zotero_id`: Fetch document from Zotero library
-- `url`: Download document from URL
-- `raw_data`: Raw document bytes
-- `doc_type`: Optional type override
-- `max_quotations`: Maximum number of quotations to extract (default: 10)
+**Input Parameters**:
+- **Single document mode** (backward compatible):
+  - `zotero_id`: Fetch document from Zotero library
+  - `url`: Download document from URL
+  - `raw_data`: Raw document bytes
+  - `doc_type`: Optional type override
+  - `max_quotations`: Maximum number of quotations to extract (default: 10)
+- **Batch mode**:
+  - `documents`: Array of document inputs, each with `zotero_id`, `url`, `raw_data`, `doc_type`, and `max_quotations` fields
 
-**Returns**: Document ID, resource URIs, document title, and list of significant quotations with page numbers and relevance explanations.
+**Returns**: 
+- `results`: Array of results, each containing document ID, resource URIs, document title, and list of significant quotations with page numbers and relevance explanations, or error message
+- `count`: Number of documents processed
+
+**Context Handling**: All operations respect context cancellation, allowing clients to cancel long-running batch operations.
 
 ### zotero-search
 Searches for items in a Zotero library and retrieves their metadata and attachment information. This tool provides a user-friendly way to discover documents in your Zotero library before parsing them. Returns bibliographic items (books, articles, etc.) along with their associated file attachments (PDFs, etc.).

@@ -264,42 +264,29 @@ func parsePDF(ctx context.Context, apiKey string, pdfData models.DocumentData, l
 		return nil, err
 	}
 
-	log.Info("Processing PDF with %d pages (parallel)", len(pages))
+	log.Info("Processing PDF with %d pages (parallel with rate limiting)", len(pages))
 
-	// Create channels for results and errors
-	type pageResult struct {
-		pageNum int
-		parsed  *models.ParsedPage
-		err     error
-	}
-	results := make(chan pageResult, len(pages))
+	// Process pages using worker pool and rate limiting
+	parsedPages, err := ParallelProcess(ctx, pages, log, func(ctx context.Context, pageNum int, pageData models.DocumentPageData) (*models.ParsedPage, error) {
+		log.Debug("Processing page %d with rate limiting", pageNum+1)
 
-	// Process each page in parallel
-	for i, page := range pages {
-		go func(pageNum int, pageData *models.DocumentPageData) {
+		// Wrap the API call with rate limiting and retry logic
+		parsed, err := RateLimitedCall(ctx, estimatedTokensPerPage, log, func(ctx context.Context) (*models.ParsedPage, error) {
 			log.Debug("Calling OpenAI API for page %d", pageNum+1)
-			parsed, err := ParsePDFPage(ctx, apiKey, pageData)
-			if err != nil {
-				log.Error("Failed to parse page %d: %v", pageNum+1, err)
-			}
-			results <- pageResult{
-				pageNum: pageNum,
-				parsed:  parsed,
-				err:     err,
-			}
-		}(i, &page)
-	}
+			return ParsePDFPage(ctx, apiKey, &pageData)
+		})
 
-	// Collect results
-	parsedPages := make([]*models.ParsedPage, len(pages))
-	for range len(pages) {
-		result := <-results
-		if result.err != nil {
-			return nil, result.err
+		if err != nil {
+			log.Error("Failed to parse page %d: %v", pageNum+1, err)
+			return nil, err
 		}
-		parsedPages[result.pageNum] = result.parsed
+
+		return parsed, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	close(results)
 
 	log.Info("Successfully parsed all %d pages", len(pages))
 
@@ -582,21 +569,26 @@ func ExtractQuotations(ctx context.Context, apiKey string, parsedItem *models.Pa
 
 // extractQuotationsFromPages processes each page individually to extract quotations with accurate page numbers
 func extractQuotationsFromPages(ctx context.Context, client *openai.Client, parsedItem *models.ParsedItem, summary string, schema map[string]any, log logger.Logger) ([]models.Quotation, error) {
-	allQuotations := make([]models.Quotation, 0)
-
-	// Process pages in parallel
-	type pageResult struct {
-		pageNum    int
-		quotations []models.Quotation
-		err        error
+	// Define page data struct for parallel processing
+	type pageData struct {
+		content       string
+		sourcePageNum string
 	}
-	results := make(chan pageResult, len(parsedItem.Pages))
 
-	for i, pageContent := range parsedItem.Pages {
-		go func(pageIndex int, content string, sourcePageNum string) {
-			log.Debug("Extracting quotations from page %d (source: %s)", pageIndex+1, sourcePageNum)
+	// Prepare page data
+	pages := make([]pageData, len(parsedItem.Pages))
+	for i := range parsedItem.Pages {
+		pages[i] = pageData{
+			content:       parsedItem.Pages[i],
+			sourcePageNum: parsedItem.PageNumbers[i],
+		}
+	}
 
-			prompt := fmt.Sprintf(`You are analyzing page %s of an academic document.
+	// Process pages using worker pool and rate limiting
+	pageQuotations, err := ParallelProcess(ctx, pages, log, func(ctx context.Context, pageIndex int, page pageData) ([]models.Quotation, error) {
+		log.Debug("Extracting quotations from page %d (source: %s) with rate limiting", pageIndex+1, page.sourcePageNum)
+
+		prompt := fmt.Sprintf(`You are analyzing page %s of an academic document.
 
 Document Summary:
 %s
@@ -619,8 +611,10 @@ For each quotation, provide:
 - relevance: Why this quotation is significant (key argument, important finding, etc.)
 
 If there are no suitable quotations on this page, return an empty array.`,
-				sourcePageNum, summary, parsedItem.Metadata.Title, content, sourcePageNum)
+			page.sourcePageNum, summary, parsedItem.Metadata.Title, page.content, page.sourcePageNum)
 
+		// Wrap the API call with rate limiting and retry logic
+		quotations, err := RateLimitedCall(ctx, estimatedTokensPerPage, log, func(ctx context.Context) ([]models.Quotation, error) {
 			response, err := client.Responses.New(ctx, responses.ResponseNewParams{
 				Model: shared.ChatModelGPT5Mini,
 				Input: responses.ResponseNewParamsInputUnion{
@@ -639,9 +633,7 @@ If there are no suitable quotations on this page, return an empty array.`,
 			})
 
 			if err != nil {
-				log.Error("Failed to extract quotations from page %d: %v", pageIndex+1, err)
-				results <- pageResult{pageNum: pageIndex, quotations: nil, err: err}
-				return
+				return nil, err
 			}
 
 			var result struct {
@@ -650,33 +642,29 @@ If there are no suitable quotations on this page, return an empty array.`,
 			outputText := response.OutputText()
 			err = json.Unmarshal([]byte(outputText), &result)
 			if err != nil {
-				log.Error("Failed to parse quotations from page %d: %v", pageIndex+1, err)
-				results <- pageResult{pageNum: pageIndex, quotations: nil, err: err}
-				return
+				return nil, err
 			}
 
-			log.Debug("Found %d quotations on page %d", len(result.Quotations), pageIndex+1)
-			results <- pageResult{pageNum: pageIndex, quotations: result.Quotations, err: nil}
-		}(i, pageContent, parsedItem.PageNumbers[i])
+			return result.Quotations, nil
+		})
+
+		if err != nil {
+			log.Error("Failed to extract quotations from page %d: %v", pageIndex+1, err)
+			return nil, err
+		}
+
+		log.Debug("Found %d quotations on page %d", len(quotations), pageIndex+1)
+		return quotations, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	// Collect results
-	pageQuotations := make(map[int][]models.Quotation)
-	for range len(parsedItem.Pages) {
-		result := <-results
-		if result.err != nil {
-			close(results)
-			return nil, result.err
-		}
-		pageQuotations[result.pageNum] = result.quotations
-	}
-	close(results)
-
-	// Aggregate in page order
-	for i := 0; i < len(parsedItem.Pages); i++ {
-		if quotes, ok := pageQuotations[i]; ok {
-			allQuotations = append(allQuotations, quotes...)
-		}
+	// Aggregate all quotations in page order
+	allQuotations := make([]models.Quotation, 0)
+	for _, quotes := range pageQuotations {
+		allQuotations = append(allQuotations, quotes...)
 	}
 
 	log.Info("Successfully extracted %d quotations from %d pages", len(allQuotations), len(parsedItem.Pages))

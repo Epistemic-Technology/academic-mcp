@@ -78,12 +78,18 @@ func SearchZotero(ctx context.Context, apiKey, libraryID string, params ZoteroSe
 	if queryParams.Sort == "" {
 		queryParams.Sort = "dateModified"
 	}
+	if len(queryParams.ItemType) == 0 {
+		queryParams.ItemType = []string{"-attachment"}
+	}
 
 	// Search for items (either in a specific collection or the entire library)
 	var items []zotero.Item
 	var err error
 	if params.Collection != "" {
-		// Search within a specific collection
+		// If we're retriving items in a collection, we want to retrieve the max number of items (100)
+		if queryParams.Limit == 0 {
+			queryParams.Limit = 100
+		}
 		items, err = client.CollectionItems(ctx, params.Collection, queryParams)
 		if err != nil {
 			log.Error("Failed to search collection %s: %v", params.Collection, err)
