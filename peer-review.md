@@ -1,0 +1,149 @@
+# Peer Review in Scholarly Communication: A Literature Review
+
+## Introduction
+
+Peer review occupies a paradoxical position in contemporary science: it is simultaneously "at the heart of the processes of not just medical journals but of all of science" [@smith2006, p. 178] and widely criticized as "slow, expensive, profligate of academic time, highly subjective, something of a lottery, prone to bias, and easily abused" [@smith2006, p. 179; @waltmanEtAl2023, p. 334]. Despite these documented shortcomings, peer review remains central to research funding decisions, publication outcomes, career advancement, and the legitimation of scientific knowledge. As @jubb2016 [p. 20] notes, "Peer review remains fundamental to scholarly communications," though its practices and purposes are far from uniform. This literature review synthesizes recent scholarship on peer review, examining its historical development, documented problems, ongoing innovations, and future directions.
+
+## Historical Foundations
+
+### Origins and Institutionalization
+
+The genealogy of peer review is more complex and contingent than commonly assumed. While often attributed to the Royal Society's establishment of a Committee on Papers in 1752, @kronick1990 demonstrates that the practice of evaluating manuscripts by knowledgeable colleagues predates this formal institutionalization, with learned societies across Europe—including the Royal Society of Edinburgh, the Académie Royale de Médecine, and the Literary and Philosophical Society of Manchester—implementing explicit procedures for distributing submissions to expert members.
+
+@biagioli2002 offers a provocative reframing of this history, arguing that peer review emerged not from scientific autonomy but from royal licensing privileges: "while peer review is now cast as a sign of the hard-won independence of science from socio-political interests, it actually developed as the result of royal privileges attributed to very few academies to become part and parcel of the book licensing and censorship systems" [p. 14]. He theorizes peer review as a disciplinary mechanism that represents "the 'degree zero' of discipline in the sense that, being the condition of possibility for all disciplines of the modern academic system, its subject and object are not and cannot be permanently distinct" [@biagioli2002, p. 12]. This Foucauldian interpretation situates peer review within a "long-term trajectory of the disciplining of printed texts as moving from early modern book-burning (the public material destruction of the text as object) to modern peer review (the internal disciplining of a text and its author)" [@biagioli2002, p. 5].
+
+### Uneven Diffusion in Journal Practice
+
+The diffusion of editorial peer review in scientific journals was neither orderly nor imitative. @burnham1990 finds that "editorial peer review procedures did not spread in an orderly way; they were not developed from editorial boards and passed on from journal to journal" [p. 1323]. More surprisingly, he demonstrates that "editorial peer review did not grow out of or interact with grant peer review" [@burnham1990, p. 1323], challenging assumptions about institutional continuity. Instead, peer review developed sporadically at the journal level in response to two principal pressures: rising specialization that placed expertise beyond the grasp of single editors, and a reversal in manuscript supply-and-demand that made selective rejection practicable. The newspaper model, with its strong editor-centered ethos, actively inhibited systematic external review [@burnham1990]. @spier2002 traces how technological advances—typewriters, carbon paper, photocopiers—gradually enabled the extension of review beyond society circles to external experts, facilitating the postwar professionalization and commercialization of peer review.
+
+## Contemporary Practices and Their Diversity
+
+### Definitional Ambiguity
+
+A persistent challenge in evaluating peer review is its resistance to operational definition. @smith2006 [p. 178] observes that "peer review is impossible to define in operational terms (an operational definition is one whereby if 50 of us looked at the same process we could all agree most of the time whether or not it was peer review)." This definitional fluidity extends to reform proposals: @rosshellauer2017 [p. 1] documents that "'open peer review' (OPR), despite being a major pillar of Open Science, has neither a standardized definition nor an agreed schema of its features and implementations." Synthesizing 122 explicit or implicit definitions from the literature, Ross-Hellauer identified 22 distinct configurations of seven traits—most prominently open identities, open reports, and open participation—demonstrating considerable heterogeneity in what "open peer review" means in practice.
+
+### Core Practices
+
+Despite this conceptual plurality, @horbachHalffman2019 [p. 146] identify a "core set of review procedures, used in combination by 75% of all journals," consisting of five principles: "(i) pre-publication review, (ii) using methodological rigour and correctness as selection criteria, (iii) performed by external reviewers suggested and selected by editor(s), (iv) keeping reviewers anonymous (both to authors and other reviewers, as well as to readers of the published manuscript) and (v) making review reports accessible to authors and editors." Survey research by @kempWare2008 corroborates this picture, finding that double-blind review is both most preferred (56%) and most widely perceived as effective (71%), while open review elicits substantial reluctance. Authors report an average elapsed review time of approximately 80 days, with satisfaction declining markedly as delays lengthen.
+
+### The Reality of Innovation Uptake
+
+Despite decades of proposals for reform, empirical evidence suggests that innovation in peer review proceeds slowly. @horbachHalffman2019 [p. 1] found that "in spite of enthusiastic innovation, the adoption of new peer review procedures is in fact very slow, with the exception of text similarity scanners." Only 47% of surveyed journals reported any procedural change since 2000, and the mean number of changes per journal was 0.8. @tennant2018 [p. 2] diagnoses "a divergence between how peer review is generally practiced as a multi-dimensional and diverse suite of processes, and how it is commonly regarded as a singular ideologue," a mismatch that complicates both evaluation and reform.
+
+## Documented Problems and Critiques
+
+### Reliability and Reproducibility
+
+A substantial body of empirical work challenges peer review's reliability. @rothwellMartyn2000 [p. 1] found that inter-reviewer agreement on manuscript decisions was "not significantly greater than that expected by chance" (κ = 0.08) in one journal and poor (κ = 0.28) in another, concluding that "poor reproducibility casts doubt on the utility of any measurement." Similarly, @smith2006 [p. 178] reports that "the level of agreement between reviewers on whether a paper should be published is little better than you'd expect by chance."
+
+The classic study by @petersCeci1982 provides dramatic evidence of inconsistency: when twelve previously published psychology articles were minimally altered and resubmitted to the same journals with fictitious low-status author affiliations, only 8% of editors and reviewers detected the resubmissions, and eight of the nine that proceeded to full review were rejected [@petersCeci1982, p. 187]. The authors interpreted this as potential "response bias in favor of the original authors as a function of their association with prestigious institutions" [@petersCeci1982, p. 192].
+
+### Systematic Biases
+
+Research on bias in peer review documents recurring patterns across multiple dimensions. @leeEtAl2012 synthesize evidence that peer evaluations vary with author nationality and institutional prestige, reviewer characteristics (including gender, nationality, and disciplinary culture), affiliation ties between authors and reviewers, and confirmation bias. @stelmakhEtAl2023 provide experimental evidence from computer science conferences that citing a reviewer's prior work induces a positive bias of approximately +0.23 on a 5-point scale, with potentially meaningful implications for acceptance chances.
+
+@tomkinsEtAl2017 report that single-blind reviewers entered 22% fewer bids and were significantly more likely to recommend acceptance of papers by famous authors (odds ratio 1.63) and authors from top universities (odds ratio 1.58) or companies (odds ratio 2.10) compared to double-blind reviewers. However, @leeEtAl2012 caution that evidence for some widely alleged biases—notably against female authors, interdisciplinary work, or non-English-speaking authors—is mixed or inconclusive, and they critique psychometric approaches that treat reviewer disagreement as error while neglecting legitimate epistemic diversity.
+
+### Failure to Detect Errors and Fraud
+
+Peer review's capacity to detect methodological flaws, statistical errors, and deliberate fraud is limited. @benosEtAl2007 review high-profile cases in which peer review failed to catch errors or misconduct, while @henderson2010 points to episodes such as the Wakefield MMR paper and climate science controversies as evidence that "errors, undeclared conflicts of interest, and fraud can evade conventional refereeing." @tennantEtAl2017 [p. 2] summarize that "studies of peer review have shown that it is prone to bias and abuse in numerous dimensions, frequently unreliable, and can fail to detect even fraudulent research."
+
+### Inefficiency and Opportunity Costs
+
+The time and labor demands of peer review are substantial. @tennant2018 [p. 3] notes that "available evidence suggests that the majority of reviews are performed by a minority of researchers within an increasingly over-burdened system," creating "reviewer fatigue." @huismanSmits2017 document that mean first response time is approximately 13 weeks and mean total review duration for accepted manuscripts about 17 weeks, with considerable field variation and author dissatisfaction when processes are protracted.
+
+@foltz2000 characterizes peer review as imposing "substantial time and opportunity costs for applicants and referees," while @florian2012 estimates that if all careful readings by scientists were logged, the theoretical average would be very high, but actual uptake of voluntary post-publication reviewing remains modest, indicating untapped potential for distributed evaluation. @jubb2016 [p. 15] notes that peer review "fails in its filtering aim of seeking to ensure that the best papers get into the highest-status journals," and @silerEtAl2015 find that many highly cited papers were rejected by elite medical journals—12 of the 15 most-cited manuscripts in their dataset were desk-rejected—while accepted articles had relatively high median citation percentiles.
+
+## Philosophical and Normative Debates
+
+### Should Prepublication Peer Review Be Abolished?
+
+@heesenBright2021 [p. 636] advance a provocative epistemic-consequentialist argument that "the present state of the evidence suggests that abolishing prepublication peer review would lead to a peculiar sort of Pareto improvement: each factor considered is either neutral or favours our proposal." They contend that prepublication review is a major sink of time and resources, that its putative epistemic functions (quality control, prestige sorting, malpractice detection) lack robust empirical support, and that "long-run credit is both a more considered opinion of the scientific importance of the article and a more democratic one" [@heesenBright2021, p. 646] than short-run peer judgments. Their proposal: "Scientists themselves will decide when their work is ready for sharing" [@heesenBright2021, p. 639], with optional postpublication curation.
+
+@rowbottom defends prepublication review on three grounds: substantial epistemic opportunity costs would attend systemic change, prepublication review may mitigate certain biases and confer reputational signals that affect uptake, and easy self-publication would precipitate a volume increase with attendant negative consequences for discoverability and review quality. He concludes that "the more modest policy implication supported by current evidence is the need for further empirical investigation and more precise proposals, rather than immediate abolition of prepublication review" [@rowbottom, p. 25].
+
+### Impartiality and Social Epistemology
+
+@leeEtAl2012 [p. 4] define "impartiality in peer evaluations as the ability for any reviewer to interpret and apply evaluative criteria in the same way in the assessment of a submission," but they challenge whether this ideal can or should be sustained. Drawing on social epistemology, they argue that reviewer disagreement can reflect legitimate differences in epistemic styles and that unanimity can mask shared, systematic biases. They conclude that "the inescapable sociality and partiality of peer evaluation raise questions about whether impartiality can or should be upheld as the ideal for peer review" [@leeEtAl2012, p. 13].
+
+Similarly, @bornmann2008 develops a theoretical framework integrating Mertonian norms, social constructivism, and Luhmannian systems theory, arguing that empirical inconsistencies in peer review studies mirror theoretical fragmentation. He recommends treating peer review both as an abstract communicative selection process and as conduct shaped by norms and local social factors.
+
+## Innovations and Alternative Models
+
+### Open Peer Review
+
+Open peer review has gained traction as an umbrella term encompassing multiple reforms. @rosshellauer2017 [p. 14] concludes that "(1) the individual traits of OPR can be argued to address many of the problems with traditional peer review, but (2) differing traits addresses differing problems in differing ways, (3) no trait addresses all problems, and in fact (4) individual traits may actually exacerbate problems in some areas" and "(5) there is often little evidence to support or challenge many of these claims." Despite enthusiasm, @rosshellauerEtAl2023 issue an urgent call for coordinated empirical research, warning that OPR risks being adopted on the basis of intuition rather than evidence.
+
+Randomized trials of open review have yielded mixed results. @ware2008 reports that BMJ trials of signed reviews found no decline in review quality but a modest acceptance bias, while @benosEtAl2007 note that unmasking can reduce undisclosed conflicts but increases reviewer reluctance. @waltmanEtAl2023 [p. 343] propose hybrid arrangements: "We will be offering double-blind review before publication, and transparent review post-publication. We believe these two processes complement each other perfectly, allowing for maximum objectivity during the review process, and maximum transparency after publication."
+
+### Soundness-Only and Mega-Journals
+
+Open-access mega-journals such as PLOS ONE and Frontiers have implemented "soundness-only" review policies that assess technical rigor rather than novelty or significance, delegating importance judgments to post-publication community filtering. @speziEtAl2018 [p. 137] define this model as aiming "to evaluate only the rigour of an article, not the novelty or significance of the research or its relevance to a particular community, with these elements being left for 'the community to decide' post-publication."
+
+However, their interview study with senior publishers and editors found persistent divergence between the vision and editorial reality: "criteria beyond technical or scientific soundness can and do influence editorial decisions" [@speziEtAl2018, p. 137]. Editors mentally filter out novelty criticisms, reviewers commonly reintroduce traditional evaluative judgments despite guidance, and publishers have instituted informal "worthiness" thresholds. @speziEtAl2018 [p. 153] characterize such practices as "reviewing for novelty and significance by stealth," and note that "post-publication measures, which ought to have some importance in the soundness-only peer review model by providing evidence of the way in which the 'community has decided', are underdeveloped as yet" [@speziEtAl2018, p. 155].
+
+### Post-Publication and Community Review
+
+@kriegeskorte2012 [p. 1] argues that "the two major functions of a scientific publishing system are to provide access to and evaluation of scientific papers," and contends that while open access has advanced, "open evaluation remains underdeveloped." He proposes a post-publication system in which "any scientist can instantly publish a peer review on any published paper" [@kriegeskorte2012, p. 5], with reviews reconceived as citable mini-publications that feed into plural, independently defined "paper evaluation functions" (PEFs). A key architectural innovation is the "division of powers between the accumulation of evaluative evidence and the analysis of this evidence by paper evaluation functions" [@kriegeskorte2012, p. 1], enabling transparency and contestability.
+
+@doran2021 provides an overview of post-publication peer review (PPPR), distinguishing primary PPPR (in which review entirely follows publication) from secondary PPPR (which complements conventional review). He credits PPPR with accelerating dissemination and widening participation but identifies substantive limitations: rapid publication without prior filtering raises risks of poor methodology or misinterpretation, PPPR forums are vulnerable to trolling and fragmentation, and current governance mechanisms are insufficiently structured.
+
+@barbourStell describe PubPeer as an independent platform designed to lower barriers to critique by permitting strong user anonymity combined with moderation rules demanding evidence-based, non-speculative comments. They contend that anonymity has encouraged disclosure of substantive problems—notably image manipulation—without demonstrable cases of unjust career harm, though @powell2023 cautions that non-peer-reviewed critiques published in prominent venues can generate disproportionate public harm by amplifying ad hominem claims.
+
+### Preprints and Decoupled Review
+
+@ewalkerSilva2015 document the growth of non-commercial preprint servers—exemplified by ArXiv, which shifted from a preliminary-sharing service to a primary publication venue in physics—and note the rapid expansion of non-selective review in biomedical mega-journals. @tennantEtAl2017 [p. 18] propose "to decouple the concept of the journal and its functions (e.g., archiving, registration and dissemination) from peer review and the certification that this provides," enabling a "publish then filter" model. @jubb2016 [p. 17] observes that such models "represent the most radical shift from a 'filter then publish' to a 'publish then filter' model; but as yet, there has been little take-up."
+
+### Alternative Selection Mechanisms
+
+Several scholars have proposed radical alternatives to peer-mediated selection. @gillies2014 advocates selecting among minimally competent grant applications by random choice rather than peer review, arguing that this would be cheaper, neutral with respect to orthodoxies, and better at preserving exploratory diversity. Similarly, @roy1985 proposes a "Peer-Reviewed-Productivity Formula" that allocates institutional research funds based on measurable, peer-validated outputs rather than proposals, contending that performance-based approaches reduce leverage of single reviewers and stabilize long-term support.
+
+@avin2014a develops agent-based simulations showing that on large, dynamic "epistemic landscapes," merit assessments based on past experience can be unreliable, and he proposes a mixed mechanism: expert triage combined with randomized selection among the indeterminate middle. @thicke2017, however, cautions that prediction markets for science—despite success in political contexts—are likely ineffective for long-horizon, ambiguously operationalized scientific questions and could produce deleterious institutional effects.
+
+## Four Schools of Thought
+
+@waltmanEtAl2023 [p. 343] organize the landscape of peer review innovation into "four schools of thought, referred to as the Quality & Reproducibility school, the Democracy & Transparency school, the Equity & Inclusion school, and the Efficiency & Incentives school." The Quality & Reproducibility school emphasizes methodological rigor through measures such as registered reports and statistical review; the Democracy & Transparency school prioritizes publicizing evaluations through open or post-publication review; the Equity & Inclusion school foregrounds demographic and epistemic diversity via double-anonymous review and diverse reviewer pools; and the Efficiency & Incentives school focuses on reducing burden and rewarding labor via portable review and recognition platforms like Publons.
+
+These orientations often complement one another, but @waltmanEtAl2023 [p. 334] note substantive tensions "between binary accept/reject gatekeeping and publish-then-review philosophies, between anonymity and accountability, and between quality-intensive practices and the need to conserve reviewer capacity." @kaltenbrunnerEtAl2022a similarly find that contemporary innovations are "internally heterogeneous and often internally contradictory: initiatives aimed at efficiency and cost reduction... may conflict with those that increase rigor and workload..., while movements toward transparency collide with commitments to anonymization intended to reduce bias."
+
+## Evidence Gaps and the Need for Empirical Evaluation
+
+A recurring theme in the literature is the paucity of robust empirical evidence about peer review's effectiveness and the effects of proposed reforms. @waltmanEtAl2023 [p. 336] report that "'we cannot provide conclusive recommendations on the use of interventions to improve quality of peer review... the state of the evidence falls short of generating empirical support'." @jeffersonEtAl2002 conducted Cochrane-style systematic reviews and concluded that assessment and improvement of peer review are impeded by a lack of agreed objectives and by methodological obstacles, proposing collaborative, large-scale research with validated quality instruments.
+
+@smith2006 [p. 182] offers a memorable summary: "peer review is a flawed process, full of easily identified defects with little evidence that it works. Nevertheless, it is likely to remain central to science and journals because there is no obvious alternative, and scientists and editors have a continuing belief in peer review. How odd that science should be rooted in belief." @tennant2018 [p. 2] echoes this sentiment, noting "a state of begrudging acceptance of the present state of peer review, despite decades of criticisms and little evidence that it even fulfils the process it is purported to do."
+
+## The Role of Incentives and Institutional Context
+
+Several scholars emphasize that peer review operates within broader incentive structures that shape its functioning and uptake of reforms. @tennant2018 [p. 7] identifies "three primary answers" to why innovative models have low adoption: "a general lack of evidence into the peer review process at different scales, the apparent decoupling of peer review from any sort of formalised recognition for academic career advancement and the above-mentioned perception of risk associated with non-traditional processes of scholarly communication."
+
+@schimanskiAlperin2018 document that research productivity and publication in prestigious venues are increasingly privileged in promotion and tenure decisions, producing misalignment between how faculty spend their time and how their work is evaluated, and encouraging reliance on proxies such as journal prestige. @biagioliEtAla argue that digitization, commercialization, and audit cultures have transformed the scientific paper into an "accounting unit" whose value is indexed by readily available metrics, creating incentives for rapid publication and, in some cases, gaming behaviors.
+
+@kaltenbrunnerEtAl2022 conceptualize journal peer review as a "fragile gift economy" sustained by recurring experiences of mutual indebtedness rather than a self-regulating norm, and show that editors perform indispensable curatorial labor to organize and maintain cycles of reciprocal review. They highlight tensions between economizing attention through triage and the need to expand cycles of exchange to sustain plurality.
+
+## Structural and Systemic Critiques
+
+Beyond individual-level problems, several authors identify systemic features that constrain reform. @lipworthKerridge2010 describe peer review as characterized by "shifting, context-dependent networks of power and epistemic authority" rather than simple reviewer dominance, and argue that ethical responses should move beyond constraining "power-over" to acknowledge facilitative and contested aspects. @fisherParisis2015 contend that contemporary peer review in the biological sciences "frequently fails at multiple stages—editorial triage, referee evaluation and revision—while also shaping funding and hiring decisions," functioning "more as a legitimizing myth for industries and institutions than as a reliable arbiter of scientific truth."
+
+@biagioliEtAl propose "abandoning the journal article as the primary medium for reporting primary research in favor of linked, structured, machine-readable reports that integrate protocols, annotated datasets, and standardized outcome fields," arguing that the dual role of articles as both knowledge vehicles and currency for assessment fosters selective reporting and nondisclosure. @tennantEtAl2017 [p. 35] memorably suggest that "if the current system of peer review were to undergo peer review, it would undoubtedly achieve a 'revise and resubmit' decision."
+
+## Recommendations for Reform and Research
+
+Multiple authors converge on a set of priorities for improving peer review:
+
+1. **Empirical evaluation**: @rosshellauerEtAl2023 issue an urgent call for coordinated research establishing core outcomes and pursuing large-scale observational studies and randomized trials across disciplines. @jubb2016 [p. 20] cautions that "unless the purposes are defined more clearly than at present, some of the current experimentation may prove to be of little point."
+
+2. **Transparency and accountability**: @tennant2018 [p. 3] identifies "transparency in peer review, which itself is part of wider changes in the scholarly communication system around the advent of 'open science'" as unifying incentivisation, certification, and moderation challenges. @pragerEtAl2019 recommend preregistration, Registered Reports, open-data badges, and specialized statistical review.
+
+3. **Recognition and incentives**: @florian2012 contends that institutional recognition of certified reviewing activity is key to increasing participation in post-publication review, while @tennantEtAl2017 [p. 21] propose that successful systems incorporate "1. Quality control and moderation, possibly through openness and transparency; 2. Certification via personalized reputation or performance metrics; 3. Incentive structures to motivate and encourage engagement."
+
+4. **Diversity and structured elicitation**: @marcociEtAl2022 propose reconceptualizing peer review as structured expert elicitation, applying tested protocols (specifically the IDEA protocol) to improve accuracy and transparency, emphasizing recruitment of cognitively diverse assessors and mathematically aggregating independent judgments.
+
+5. **Hybrid and pluralistic models**: @waltmanEtAl2023 propose hybrid arrangements combining basic quality assurance with optional in-depth review and community feedback, situated within broader shifts in research assessment and open science. @tennantEtAl2017 advocate pragmatic recombination of existing platform traits to provide transparent, community-moderated quality control with portable reputation linked to persistent identifiers.
+
+## Conclusion
+
+Peer review in scholarly communication is a contested institution whose practices, purposes, and effectiveness remain subjects of debate. While @waltmanEtAl2023 [p. 334] affirm that "peer review plays an essential role as one of the cornerstones of the scholarly publishing system," empirical and theoretical work documents serious shortcomings: poor inter-reviewer reliability, systematic biases, failure to detect errors or misconduct, substantial inefficiency, and weak predictive validity. Historical scholarship reveals that peer review's origins were less pristine than commonly believed, and its diffusion was uneven and shaped by contingent institutional pressures.
+
+Contemporary innovations—open peer review, post-publication review, soundness-only mega-journals, preprint servers, and structured elicitation protocols—offer promising directions but face barriers of interoperability, formal recognition, cultural inertia, and insufficient empirical evidence. The literature converges on a call for systematic evaluation, greater transparency, meaningful incentives, and heterogeneity of models tailored to disciplinary and institutional contexts.
+
+Ultimately, peer review's persistence despite its documented flaws testifies less to its perfection than to the absence of superior alternatives and the community's continuing faith in collective judgment. As @jubb2016 [p. 19] observes, "peer review remains fundamental to scholarly communications," yet its future will depend on whether reforms can address identified problems without undermining the trust and authority that peer review is meant to confer. The path forward requires not only technical and procedural innovations but also deeper reflection on the normative foundations and epistemic ideals that peer review should serve.
