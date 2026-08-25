@@ -48,6 +48,10 @@ func CreateServer(log logger.Logger) *mcp.Server {
 		return tools.BibliographyExportToolHandler(ctx, req, query, store, log)
 	})
 
+	mcp.AddTool(server, tools.DocumentProcessCitationsTool(), func(ctx context.Context, req *mcp.CallToolRequest, query tools.DocumentProcessCitationsQuery) (*mcp.CallToolResult, *tools.DocumentProcessCitationsResponse, error) {
+		return tools.DocumentProcessCitationsToolHandler(ctx, req, query, store, log)
+	})
+
 	// Template for document summary
 	server.AddResourceTemplate(&mcp.ResourceTemplate{
 		URITemplate: "pdf://{documentId}",

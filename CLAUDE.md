@@ -363,6 +363,87 @@ Exports bibliography in BibTeX format for parsed documents. This tool generates 
 
 **Note**: Only documents that have been previously parsed and have citekeys can be exported. Documents without citekeys will be listed in the `missing_citekey` field.
 
+### document-process-citations
+Processes a markdown document containing pandoc-style citations (e.g., `[@citekey]`) and generates formatted output with a bibliography. This tool uses pandoc with citeproc to format citations according to a specified CSL style. All cited documents must have been previously parsed and stored in the library.
+
+**Input Parameters**:
+- `content`: Markdown content with pandoc-style citations (required)
+- `csl_style`: Path to CSL style file (optional). If not specified, uses pandoc's default style (typically similar to APA)
+- `output_format`: Output format (optional, default: "markdown"). Supported formats:
+  - `"markdown"` or `"md"`: Markdown output with formatted citations
+  - `"html"`: HTML output
+  - `"docx"`: Microsoft Word document
+  - `"pdf"`: PDF output (requires LaTeX/XeLaTeX)
+
+**Returns**:
+- `processed_content`: Document with formatted citations and bibliography
+- `output_format`: The format of the processed content
+- `citation_count`: Number of unique citations found in the document
+- `warnings`: Array of warnings for missing citekeys or other issues
+
+**Citation Syntax**: Supports standard pandoc citation syntax:
+- `[@smith2020]` - Standard citation in parentheses
+- `[@smith2020; @jones2021]` - Multiple citations
+- `@smith2020` - In-text citation (author as part of sentence)
+- `[-@smith2020]` - Suppress author, show only year
+- `[see @smith2020, pp. 10-15]` - Citation with prefix and page numbers
+
+**Example Workflow**:
+```
+1. Parse documents using document-parse:
+   Each document gets a citekey (e.g., "smith2020", "jonesEtAl2021")
+
+2. Write markdown content with citations:
+   "According to @smith2020, climate adaptation requires [@jonesEtAl2021; @brown2019]."
+
+3. Process citations:
+   content=<markdown_text>, csl_style="apa.csl", output_format="html"
+
+4. Receive formatted output with bibliography:
+   Citations are formatted according to CSL style, bibliography is appended
+```
+
+**Example Input**:
+```markdown
+# Climate Adaptation Strategies
+
+Recent research has shown significant progress in climate adaptation [@smith2020]. 
+Multiple studies have confirmed these findings [@jones2021; @brown2019].
+
+According to @wilson2022, implementation remains challenging.
+```
+
+**Example Output** (markdown format with APA-like style):
+```markdown
+# Climate Adaptation Strategies
+
+Recent research has shown significant progress in climate adaptation (Smith, 2020). 
+Multiple studies have confirmed these findings (Jones, 2021; Brown, 2019).
+
+According to Wilson (2022), implementation remains challenging.
+
+## References
+
+Brown, J. (2019). Climate policy implementation. *Environmental Studies*, 45(3), 234-256.
+
+Jones, M., et al. (2021). Adaptation frameworks. *Nature Climate Change*, 11(2), 123-145.
+
+Smith, J. (2020). Climate adaptation strategies. *Science*, 368(6492), 789-801.
+
+Wilson, K. (2022). Implementation challenges. *Policy Review*, 15(1), 45-67.
+```
+
+**Requirements**:
+- Pandoc must be installed on the system
+- All cited documents must exist in the library (have been parsed)
+- Documents must have citekeys assigned
+
+**Notes**:
+- Missing citekeys will generate warnings but won't stop processing
+- The bibliography is automatically appended to the document
+- CSL style files can be downloaded from the [Zotero Style Repository](https://www.zotero.org/styles)
+- For PDF output, a LaTeX distribution (e.g., TeX Live, MiKTeX) must be installed
+
 ### Shared Operations
 
 Both tools use the `internal/operations/GetOrParseDocument()` function, which:
